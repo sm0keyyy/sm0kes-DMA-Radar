@@ -171,7 +171,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint PaintScav { get; } = new()
         {
-            Color = SKColors.Yellow,
+            Color = SKColors.Orange,
             StrokeWidth = 1.66f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
@@ -181,7 +181,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint TextScav { get; } = new()
         {
-            Color = SKColors.Yellow,
+            Color = SKColors.Orange,
             IsStroke = false,
             IsAntialias = true,
         };
@@ -239,7 +239,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint PaintPScav { get; } = new()
         {
-            Color = SKColors.White,
+            Color = SKColors.LightBlue,
             StrokeWidth = 1.66f,
             Style = SKPaintStyle.Stroke,
             IsAntialias = true,
@@ -249,7 +249,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint TextPScav { get; } = new()
         {
-            Color = SKColors.White,
+            Color = SKColors.LightBlue,
             IsStroke = false,
             IsAntialias = true,
         };
@@ -619,7 +619,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint PaintAimviewWidgetScav { get; } = new()
         {
-            Color = SKColors.Yellow,
+            Color = SKColors.Orange,
             StrokeWidth = 1,
             Style = SKPaintStyle.Stroke
         };
@@ -633,7 +633,7 @@ namespace LoneEftDmaRadar.UI.Skia
 
         public static SKPaint PaintAimviewWidgetPScav { get; } = new()
         {
-            Color = SKColors.White,
+            Color = SKColors.LightBlue,
             StrokeWidth = 1,
             Style = SKPaintStyle.Stroke
         };

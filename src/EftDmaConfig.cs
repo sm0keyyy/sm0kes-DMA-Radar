@@ -585,6 +585,30 @@ namespace LoneEftDmaRadar
         public bool EspAINames { get; set; } = true;
 
         /// <summary>
+        /// Show head circles on players in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerHeadCircles")]
+        public bool EspPlayerHeadCircles { get; set; } = false;
+
+        /// <summary>
+        /// Size of player head circles in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerHeadCircleSize")]
+        public float EspPlayerHeadCircleSize { get; set; } = 5f;
+
+        /// <summary>
+        /// Show head circles on AI in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIHeadCircles")]
+        public bool EspAIHeadCircles { get; set; } = false;
+
+        /// <summary>
+        /// Size of AI head circles in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIHeadCircleSize")]
+        public float EspAIHeadCircleSize { get; set; } = 5f;
+
+        /// <summary>
         /// Show ESP Overlay.
         /// </summary>
         [JsonPropertyName("showESP")]
@@ -655,6 +679,36 @@ namespace LoneEftDmaRadar
         /// </summary>
         [JsonPropertyName("espCrosshairLength")]
         public float EspCrosshairLength { get; set; } = 25f;
+
+        /// <summary>
+        /// Enable text outlines in ESP for better readability.
+        /// </summary>
+        [JsonPropertyName("espTextOutlines")]
+        public bool EspTextOutlines { get; set; } = true;
+
+        /// <summary>
+        /// Use corner-style bounding boxes instead of full rectangles.
+        /// </summary>
+        [JsonPropertyName("espCornerBoxes")]
+        public bool EspCornerBoxes { get; set; } = false;
+
+        /// <summary>
+        /// Length of corner box segments in pixels.
+        /// </summary>
+        [JsonPropertyName("espCornerLength")]
+        public float EspCornerLength { get; set; } = 12f;
+
+        /// <summary>
+        /// Enable distance-based opacity fading for better depth perception.
+        /// </summary>
+        [JsonPropertyName("espDistanceFading")]
+        public bool EspDistanceFading { get; set; } = true;
+
+        /// <summary>
+        /// Enable distance-based stroke scaling for visual prominence.
+        /// </summary>
+        [JsonPropertyName("espDistanceScaling")]
+        public bool EspDistanceScaling { get; set; } = true;
 
         /// <summary>
         /// Custom ESP Screen Width (0 = Auto).

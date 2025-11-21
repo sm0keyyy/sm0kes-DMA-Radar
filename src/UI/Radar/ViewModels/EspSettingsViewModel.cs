@@ -153,7 +153,124 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
                 }
             }
         }
-        
+
+        public bool EspPlayerHeadCircles
+        {
+            get => App.Config.UI.EspPlayerHeadCircles;
+            set
+            {
+                if (App.Config.UI.EspPlayerHeadCircles != value)
+                {
+                    App.Config.UI.EspPlayerHeadCircles = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspPlayerHeadCircleSize
+        {
+            get => App.Config.UI.EspPlayerHeadCircleSize;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspPlayerHeadCircleSize - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspPlayerHeadCircleSize = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspAIHeadCircles
+        {
+            get => App.Config.UI.EspAIHeadCircles;
+            set
+            {
+                if (App.Config.UI.EspAIHeadCircles != value)
+                {
+                    App.Config.UI.EspAIHeadCircles = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspAIHeadCircleSize
+        {
+            get => App.Config.UI.EspAIHeadCircleSize;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspAIHeadCircleSize - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspAIHeadCircleSize = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspTextOutlines
+        {
+            get => App.Config.UI.EspTextOutlines;
+            set
+            {
+                if (App.Config.UI.EspTextOutlines != value)
+                {
+                    App.Config.UI.EspTextOutlines = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspCornerBoxes
+        {
+            get => App.Config.UI.EspCornerBoxes;
+            set
+            {
+                if (App.Config.UI.EspCornerBoxes != value)
+                {
+                    App.Config.UI.EspCornerBoxes = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspCornerLength
+        {
+            get => App.Config.UI.EspCornerLength;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspCornerLength - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspCornerLength = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspDistanceFading
+        {
+            get => App.Config.UI.EspDistanceFading;
+            set
+            {
+                if (App.Config.UI.EspDistanceFading != value)
+                {
+                    App.Config.UI.EspDistanceFading = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspDistanceScaling
+        {
+            get => App.Config.UI.EspDistanceScaling;
+            set
+            {
+                if (App.Config.UI.EspDistanceScaling != value)
+                {
+                    App.Config.UI.EspDistanceScaling = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public bool EspLoot
         {
             get => App.Config.UI.EspLoot;

@@ -78,6 +78,21 @@
                         <CheckBox Content="Box" IsChecked="{Binding EspPlayerBoxes, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Skeleton" IsChecked="{Binding EspPlayerSkeletons, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Names" IsChecked="{Binding EspPlayerNames, Mode=TwoWay}" Margin="0,0,16,8" />
+                        <CheckBox Content="Head Circle" IsChecked="{Binding EspPlayerHeadCircles, Mode=TwoWay}" Margin="0,0,16,8" />
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Head Circle Size:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Slider x:Name="PlayerHeadCircleSizeSlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="2"
+                                Maximum="15"
+                                SmallChange="0.5"
+                                LargeChange="2"
+                                Value="{Binding EspPlayerHeadCircleSize, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=PlayerHeadCircleSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
                      </WrapPanel>
                      <WrapPanel Margin="0,4,0,0">
                         <TextBlock Text="Max Distance (0 = Unlimited):" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -102,6 +117,21 @@
                         <CheckBox Content="Box" IsChecked="{Binding EspAIBoxes, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Skeleton" IsChecked="{Binding EspAISkeletons, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Names" IsChecked="{Binding EspAINames, Mode=TwoWay}" Margin="0,0,16,8" />
+                        <CheckBox Content="Head Circle" IsChecked="{Binding EspAIHeadCircles, Mode=TwoWay}" Margin="0,0,16,8" />
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Head Circle Size:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Slider x:Name="AIHeadCircleSizeSlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="2"
+                                Maximum="15"
+                                SmallChange="0.5"
+                                LargeChange="2"
+                                Value="{Binding EspAIHeadCircleSize, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=AIHeadCircleSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
                      </WrapPanel>
                      <WrapPanel Margin="0,4,0,0">
                         <TextBlock Text="Max Distance (0 = Unlimited):" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -166,6 +196,49 @@
                                    VerticalAlignment="Center"
                                    MinWidth="50"/>
                      </WrapPanel>
+                </StackPanel>
+            </GroupBox>
+
+            <!-- Visual Settings -->
+            <GroupBox Header="Visual Settings" Margin="0,0,0,12">
+                <StackPanel>
+                    <TextBlock Text="Text Rendering:" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <WrapPanel Margin="0,0,0,8">
+                        <CheckBox Content="Text Outlines"
+                                  IsChecked="{Binding EspTextOutlines, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                    </WrapPanel>
+
+                    <TextBlock Text="Bounding Box Style:" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <WrapPanel Margin="0,0,0,8">
+                        <CheckBox Content="Corner Boxes (instead of full)"
+                                  IsChecked="{Binding EspCornerBoxes, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                    </WrapPanel>
+                    <WrapPanel Margin="0,0,0,8">
+                        <TextBlock Text="Corner Length:" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Slider x:Name="CornerLengthSlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="5"
+                                Maximum="25"
+                                SmallChange="1"
+                                LargeChange="5"
+                                Value="{Binding EspCornerLength, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=CornerLengthSlider, StringFormat='{}{0:F0}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                    </WrapPanel>
+
+                    <TextBlock Text="Distance Effects:" FontWeight="Bold" Margin="0,0,0,4"/>
+                    <WrapPanel Margin="0,0,0,8">
+                        <CheckBox Content="Opacity Fading"
+                                  IsChecked="{Binding EspDistanceFading, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                        <CheckBox Content="Size Scaling"
+                                  IsChecked="{Binding EspDistanceScaling, Mode=TwoWay}"
+                                  Margin="0,0,16,8" />
+                    </WrapPanel>
                 </StackPanel>
             </GroupBox>
 

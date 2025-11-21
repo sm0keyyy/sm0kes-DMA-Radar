@@ -19,6 +19,22 @@ namespace LoneEftDmaRadar.UI.ESP
     {
         #region Fields/Properties
 
+        // Performance constants
+        private const int MAX_SKELETON_BONES = 32;
+        private const float W_COMPONENT_THRESHOLD = 0.098f;
+        private const float SCREEN_MARGIN = 200f;
+        private const float PLAYER_NAME_OFFSET_Y = 20f;
+        private const float LOOT_TEXT_OFFSET_X = 4f;
+        private const float LOOT_TEXT_OFFSET_Y = 4f;
+        private const float LOOT_CIRCLE_RADIUS = 2f;
+        private const float EXFIL_CIRCLE_RADIUS = 4f;
+        private const float BOX_PADDING = 2f;
+        private const float MAX_FADE_DISTANCE = 300f;
+        private const float MAX_ALPHA_REDUCTION = 0.7f;
+        private const float DISTANCE_SCALING_FACTOR = 200f;
+        private const float BASE_SKELETON_WIDTH = 1.5f;
+        private const float BASE_BOX_WIDTH = 1.0f;
+
         public static bool ShowESP { get; set; } = true;
 
         private readonly System.Diagnostics.Stopwatch _fpsSw = new();
@@ -46,12 +62,7 @@ namespace LoneEftDmaRadar.UI.ESP
         private readonly SKFont _fpsFont;
         private readonly SKPaint _fpsPaint;
 
-        // Object pooling to reduce GC pressure
-        private readonly ConcurrentBag<SKPath> _pathPool = new();
-        private readonly ConcurrentBag<SKPaint> _paintPool = new();
-
         // Pre-allocated buffers (zero allocation rendering)
-        private readonly List<AbstractPlayer> _filteredPlayers = new(128);
         private readonly Dictionary<string, float> _textWidthCache = new(256);
 
         private Vector3 _camPos;
@@ -108,6 +119,85 @@ namespace LoneEftDmaRadar.UI.ESP
             (Bones.HumanRThigh2, Bones.HumanRCalf),
             (Bones.HumanRCalf, Bones.HumanRFoot),
         };
+
+        // Config cache struct to avoid repeated property access
+        private readonly struct ESPConfigCache
+        {
+            public readonly bool LootEnabled;
+            public readonly bool EspLoot;
+            public readonly float EspLootMaxDistance;
+            public readonly bool EspCorpses;
+            public readonly bool EspContainers;
+            public readonly bool EspFood;
+            public readonly bool EspMeds;
+            public readonly bool EspBackpacks;
+            public readonly bool EspLootConeEnabled;
+            public readonly float EspLootConeAngle;
+            public readonly bool EspLootPrice;
+            public readonly float FOV;
+            public readonly bool EspExfils;
+            public readonly bool EspCrosshair;
+            public readonly float EspCrosshairLength;
+            public readonly float EspPlayerMaxDistance;
+            public readonly float EspAIMaxDistance;
+            public readonly float MaxDistance;
+            public readonly bool EspPlayerSkeletons;
+            public readonly bool EspPlayerBoxes;
+            public readonly bool EspPlayerNames;
+            public readonly bool EspPlayerHeadCircles;
+            public readonly float EspPlayerHeadCircleSize;
+            // public readonly bool EspPlayerHealthBars; // TODO: Add to EftDmaConfig.cs when health data is available
+            public readonly bool EspAISkeletons;
+            public readonly bool EspAIBoxes;
+            public readonly bool EspAINames;
+            public readonly bool EspAIHeadCircles;
+            public readonly float EspAIHeadCircleSize;
+            // public readonly bool EspAIHealthBars; // TODO: Add to EftDmaConfig.cs when health data is available
+            public readonly bool EspTextOutlines;
+            public readonly bool EspCornerBoxes;
+            public readonly float EspCornerLength;
+            public readonly bool EspDistanceFading;
+            public readonly bool EspDistanceScaling;
+
+            public ESPConfigCache()
+            {
+                LootEnabled = App.Config.Loot.Enabled;
+                EspLoot = App.Config.UI.EspLoot;
+                EspLootMaxDistance = App.Config.UI.EspLootMaxDistance;
+                EspCorpses = App.Config.UI.EspCorpses;
+                EspContainers = App.Config.UI.EspContainers;
+                EspFood = App.Config.UI.EspFood;
+                EspMeds = App.Config.UI.EspMeds;
+                EspBackpacks = App.Config.UI.EspBackpacks;
+                EspLootConeEnabled = App.Config.UI.EspLootConeEnabled;
+                EspLootConeAngle = App.Config.UI.EspLootConeAngle;
+                EspLootPrice = App.Config.UI.EspLootPrice;
+                FOV = App.Config.UI.FOV;
+                EspExfils = App.Config.UI.EspExfils;
+                EspCrosshair = App.Config.UI.EspCrosshair;
+                EspCrosshairLength = App.Config.UI.EspCrosshairLength;
+                EspPlayerMaxDistance = App.Config.UI.EspPlayerMaxDistance;
+                EspAIMaxDistance = App.Config.UI.EspAIMaxDistance;
+                MaxDistance = App.Config.UI.MaxDistance;
+                EspPlayerSkeletons = App.Config.UI.EspPlayerSkeletons;
+                EspPlayerBoxes = App.Config.UI.EspPlayerBoxes;
+                EspPlayerNames = App.Config.UI.EspPlayerNames;
+                EspPlayerHeadCircles = App.Config.UI.EspPlayerHeadCircles;
+                EspPlayerHeadCircleSize = App.Config.UI.EspPlayerHeadCircleSize;
+                // EspPlayerHealthBars = App.Config.UI.EspPlayerHealthBars; // TODO: Add to EftDmaConfig.cs
+                EspAISkeletons = App.Config.UI.EspAISkeletons;
+                EspAIBoxes = App.Config.UI.EspAIBoxes;
+                EspAINames = App.Config.UI.EspAINames;
+                EspAIHeadCircles = App.Config.UI.EspAIHeadCircles;
+                EspAIHeadCircleSize = App.Config.UI.EspAIHeadCircleSize;
+                // EspAIHealthBars = App.Config.UI.EspAIHealthBars; // TODO: Add to EftDmaConfig.cs
+                EspTextOutlines = App.Config.UI.EspTextOutlines;
+                EspCornerBoxes = App.Config.UI.EspCornerBoxes;
+                EspCornerLength = App.Config.UI.EspCornerLength;
+                EspDistanceFading = App.Config.UI.EspDistanceFading;
+                EspDistanceScaling = App.Config.UI.EspDistanceScaling;
+            }
+        }
 
         #endregion
 
@@ -358,17 +448,20 @@ namespace LoneEftDmaRadar.UI.ESP
                     }
                     else
                     {
+                        // Cache config values once per frame for performance
+                        var cfg = new ESPConfigCache();
+
                         _cameraManager.Update(localPlayer);
                         UpdateCameraPositionFromMatrix();
 
                         // Render Loot (background layer)
-                        if (App.Config.Loot.Enabled && App.Config.UI.EspLoot)
+                        if (cfg.LootEnabled && cfg.EspLoot)
                         {
-                            DrawLoot(canvas, e.Info.Width, e.Info.Height);
+                            DrawLoot(canvas, e.Info.Width, e.Info.Height, in cfg);
                         }
 
                         // Render Exfils
-                        if (Exits is not null && App.Config.UI.EspExfils)
+                        if (Exits is not null && cfg.EspExfils)
                         {
                             foreach (var exit in Exits)
                             {
@@ -383,7 +476,7 @@ namespace LoneEftDmaRadar.UI.ESP
                                              _ => SKPaints.PaintExfilOpen
                                          };
 
-                                         canvas.DrawCircle(screen, 4f, paint);
+                                         canvas.DrawCircle(screen, EXFIL_CIRCLE_RADIUS, paint);
                                          canvas.DrawText(exfil.Name, screen.X + 6, screen.Y + 4, _textFont, SKPaints.TextExfil);
                                      }
                                 }
@@ -393,12 +486,12 @@ namespace LoneEftDmaRadar.UI.ESP
                         // Render players
                         foreach (var player in allPlayers)
                         {
-                            DrawPlayerESP(canvas, player, localPlayer, e.Info.Width, e.Info.Height);
+                            DrawPlayerESP(canvas, player, localPlayer, e.Info.Width, e.Info.Height, in cfg);
                         }
 
-                        if (App.Config.UI.EspCrosshair)
+                        if (cfg.EspCrosshair)
                         {
-                            DrawCrosshair(canvas, e.Info.Width, e.Info.Height);
+                            DrawCrosshair(canvas, e.Info.Width, e.Info.Height, cfg.EspCrosshairLength);
                         }
 
                         DrawFPS(canvas, e.Info.Width, e.Info.Height);
@@ -414,134 +507,157 @@ namespace LoneEftDmaRadar.UI.ESP
             }
         }
 
-        private void DrawLoot(SKCanvas canvas, float screenWidth, float screenHeight)
+        private void DrawLoot(SKCanvas canvas, float screenWidth, float screenHeight, in ESPConfigCache cfg)
         {
             var lootItems = Memory.Game?.Loot?.FilteredLoot;
             if (lootItems is null) return;
 
+            // Pre-calculate cone filter values once
+            float centerX = screenWidth / 2f;
+            float centerY = screenHeight / 2f;
+            float halfFov = cfg.FOV / 2f;
+            float invCenterX = 1f / centerX;
+            float invCenterY = 1f / centerY;
+            float coneAngleSq = cfg.EspLootConeAngle * cfg.EspLootConeAngle;
+            bool coneEnabled = cfg.EspLootConeEnabled && cfg.EspLootConeAngle > 0f;
+            float maxDistSq = cfg.EspLootMaxDistance * cfg.EspLootMaxDistance;
+
             foreach (var item in lootItems)
             {
-                // OPTIMIZATION: Check distance FIRST before any other checks
-                float distance = Vector3.Distance(_camPos, item.Position);
-                if (App.Config.UI.EspLootMaxDistance > 0 && distance > App.Config.UI.EspLootMaxDistance)
+                // OPTIMIZATION: Check squared distance FIRST before any other checks (avoids sqrt)
+                float distSq = Vector3.DistanceSquared(_camPos, item.Position);
+                if (cfg.EspLootMaxDistance > 0 && distSq > maxDistSq)
                     continue;
 
                 // Filter based on ESP settings
                 bool isCorpse = item is LootCorpse;
-                if (isCorpse && !App.Config.UI.EspCorpses)
+                if (isCorpse && !cfg.EspCorpses)
                     continue;
 
                 bool isContainer = item is LootContainer;
-                if (isContainer && !App.Config.UI.EspContainers)
+                if (isContainer && !cfg.EspContainers)
                     continue;
 
                 bool isFood = item.IsFood;
                 bool isMeds = item.IsMeds;
                 bool isBackpack = item.IsBackpack;
 
-                if (isFood && !App.Config.UI.EspFood)
+                if (isFood && !cfg.EspFood)
                     continue;
-                if (isMeds && !App.Config.UI.EspMeds)
+                if (isMeds && !cfg.EspMeds)
                     continue;
-                if (isBackpack && !App.Config.UI.EspBackpacks)
+                if (isBackpack && !cfg.EspBackpacks)
                     continue;
 
                 if (WorldToScreen2(item.Position, out var screen, screenWidth, screenHeight))
                 {
-                     // Calculate cone filter
-                     bool coneEnabled = App.Config.UI.EspLootConeEnabled && App.Config.UI.EspLootConeAngle > 0f;
+                     // Calculate cone filter with optimized math
                      bool inCone = true;
 
                      if (coneEnabled)
                      {
-                         float centerX = screenWidth / 2f;
-                         float centerY = screenHeight / 2f;
                          float dx = screen.X - centerX;
                          float dy = screen.Y - centerY;
-                         float fov = App.Config.UI.FOV;
-                         float screenAngleX = MathF.Abs(dx / centerX) * (fov / 2f);
-                         float screenAngleY = MathF.Abs(dy / centerY) * (fov / 2f);
-                         float screenAngle = MathF.Sqrt(screenAngleX * screenAngleX + screenAngleY * screenAngleY);
-                         inCone = screenAngle <= App.Config.UI.EspLootConeAngle;
+                         float screenAngleX = MathF.Abs(dx * invCenterX) * halfFov;
+                         float screenAngleY = MathF.Abs(dy * invCenterY) * halfFov;
+                         float screenAngleSq = screenAngleX * screenAngleX + screenAngleY * screenAngleY;
+                         inCone = screenAngleSq <= coneAngleSq;  // Avoid sqrt
                      }
 
-                     SKPaint circlePaint, textPaint;
+                     var (circlePaint, textPaint) = item switch
+                     {
+                         { Important: true } => (SKPaints.PaintFilteredLoot, SKPaints.TextFilteredLoot),
+                         { IsValuableLoot: true } => (SKPaints.PaintImportantLoot, SKPaints.TextImportantLoot),
+                         { IsBackpack: true } => (SKPaints.PaintBackpacks, SKPaints.TextBackpacks),
+                         { IsMeds: true } => (SKPaints.PaintMeds, SKPaints.TextMeds),
+                         { IsFood: true } => (SKPaints.PaintFood, SKPaints.TextFood),
+                         LootCorpse => (SKPaints.PaintCorpse, SKPaints.TextCorpse),
+                         _ => (_lootPaint, _lootTextPaint)
+                     };
 
-                     if (item.Important)
-                     {
-                         circlePaint = SKPaints.PaintFilteredLoot;
-                         textPaint = SKPaints.TextFilteredLoot;
-                     }
-                     else if (item.IsValuableLoot)
-                     {
-                         circlePaint = SKPaints.PaintImportantLoot;
-                         textPaint = SKPaints.TextImportantLoot;
-                     }
-                     else if (isBackpack)
-                     {
-                         circlePaint = SKPaints.PaintBackpacks;
-                         textPaint = SKPaints.TextBackpacks;
-                     }
-                     else if (isMeds)
-                     {
-                         circlePaint = SKPaints.PaintMeds;
-                         textPaint = SKPaints.TextMeds;
-                     }
-                     else if (isFood)
-                     {
-                         circlePaint = SKPaints.PaintFood;
-                         textPaint = SKPaints.TextFood;
-                     }
-                     else if (isCorpse)
-                     {
-                         circlePaint = SKPaints.PaintCorpse;
-                         textPaint = SKPaints.TextCorpse;
-                     }
-                     else
-                     {
-                         circlePaint = _lootPaint;
-                         textPaint = _lootTextPaint;
-                     }
-
-                     canvas.DrawCircle(screen, 2f, circlePaint);
+                     canvas.DrawCircle(screen, LOOT_CIRCLE_RADIUS, circlePaint);
 
                      if (item.Important || inCone)
                      {
                          var text = item.ShortName;
-                         if (App.Config.UI.EspLootPrice)
+                         if (cfg.EspLootPrice)
                          {
                              text = item.Important ? item.ShortName : $"{item.ShortName} ({Utilities.FormatNumberKM(item.Price)})";
                          }
-                         canvas.DrawText(text, screen.X + 4, screen.Y + 4, _lootTextFont, textPaint);
+
+                         var textX = screen.X + LOOT_TEXT_OFFSET_X;
+                         var textY = screen.Y + LOOT_TEXT_OFFSET_Y;
+
+                         // Draw text outline if enabled
+                         if (cfg.EspTextOutlines)
+                         {
+                             canvas.DrawText(text, textX, textY, _lootTextFont, SKPaints.TextOutline);
+                         }
+
+                         // Draw text fill
+                         canvas.DrawText(text, textX, textY, _lootTextFont, textPaint);
                      }
                 }
             }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DrawPlayerESP(SKCanvas canvas, AbstractPlayer player, LocalPlayer localPlayer, float screenWidth, float screenHeight)
+        private void DrawPlayerESP(SKCanvas canvas, AbstractPlayer player, LocalPlayer localPlayer, float screenWidth, float screenHeight, in ESPConfigCache cfg)
         {
             if (player is null || player == localPlayer || !player.IsAlive || !player.IsActive)
                 return;
 
             bool isAI = player.Type is PlayerType.AIScav or PlayerType.AIRaider or PlayerType.AIBoss or PlayerType.PScav;
-            float distance = Vector3.Distance(localPlayer.Position, player.Position);
-            float maxDistance = isAI ? App.Config.UI.EspAIMaxDistance : App.Config.UI.EspPlayerMaxDistance;
 
-            if (maxDistance > 0 && distance > maxDistance)
+            // Use squared distance for comparison (avoids sqrt)
+            float distSq = Vector3.DistanceSquared(localPlayer.Position, player.Position);
+            float maxDistance = isAI ? cfg.EspAIMaxDistance : cfg.EspPlayerMaxDistance;
+            float maxDistSq = maxDistance * maxDistance;
+
+            if (maxDistance > 0 && distSq > maxDistSq)
                 return;
 
-            if (maxDistance == 0 && distance > App.Config.UI.MaxDistance)
+            float maxDistGenSq = cfg.MaxDistance * cfg.MaxDistance;
+            if (maxDistance == 0 && distSq > maxDistGenSq)
                 return;
+
+            // Only calculate actual distance if needed for display or effects
+            float distance = MathF.Sqrt(distSq);
 
             var color = GetPlayerColor(player).Color;
+
+            // Apply distance-based opacity fading if enabled
+            if (cfg.EspDistanceFading)
+            {
+                float alpha = 1.0f - MathF.Min(distance / MAX_FADE_DISTANCE, MAX_ALPHA_REDUCTION);
+                color = color.WithAlpha((byte)(alpha * 255));
+            }
+
             _skeletonPaint.Color = color;
             _boxPaint.Color = color;
             _textPaint.Color = color;
 
-            bool drawSkeleton = isAI ? App.Config.UI.EspAISkeletons : App.Config.UI.EspPlayerSkeletons;
-            bool drawBox = isAI ? App.Config.UI.EspAIBoxes : App.Config.UI.EspPlayerBoxes;
-            bool drawName = isAI ? App.Config.UI.EspAINames : App.Config.UI.EspPlayerNames;
+            // Apply distance-based stroke scaling if enabled
+            if (cfg.EspDistanceScaling)
+            {
+                float scale = MathF.Min(DISTANCE_SCALING_FACTOR / MathF.Max(distance, 1f), 2.0f);
+                scale = MathF.Max(scale, 0.5f);
+
+                _skeletonPaint.StrokeWidth = BASE_SKELETON_WIDTH * scale;
+                _boxPaint.StrokeWidth = BASE_BOX_WIDTH * scale;
+            }
+            else
+            {
+                // Reset to default values
+                _skeletonPaint.StrokeWidth = BASE_SKELETON_WIDTH;
+                _boxPaint.StrokeWidth = BASE_BOX_WIDTH;
+            }
+
+            bool drawSkeleton = isAI ? cfg.EspAISkeletons : cfg.EspPlayerSkeletons;
+            bool drawBox = isAI ? cfg.EspAIBoxes : cfg.EspPlayerBoxes;
+            bool drawName = isAI ? cfg.EspAINames : cfg.EspPlayerNames;
+            bool drawHeadCircle = isAI ? cfg.EspAIHeadCircles : cfg.EspPlayerHeadCircles;
+            // bool drawHealthBar = isAI ? cfg.EspAIHealthBars : cfg.EspPlayerHealthBars; // TODO: Enable when config added
 
             if (drawSkeleton)
             {
@@ -550,12 +666,43 @@ namespace LoneEftDmaRadar.UI.ESP
 
             if (drawBox)
             {
-                DrawBoundingBox(canvas, player, screenWidth, screenHeight);
+                DrawBoundingBox(canvas, player, screenWidth, screenHeight, in cfg);
+            }
+
+            if (drawHeadCircle)
+            {
+                // Project head and neck to get natural screen-space head size
+                var headPos3D = player.GetBonePos(Bones.HumanHead);
+                var neckPos3D = player.GetBonePos(Bones.HumanNeck);
+
+                if (TryProject(headPos3D, screenWidth, screenHeight, out var headCircleScreen) &&
+                    TryProject(neckPos3D, screenWidth, screenHeight, out var neckScreen))
+                {
+                    // Calculate screen-space distance between head and neck
+                    float headNeckDist = Vector2.Distance(
+                        new Vector2(headCircleScreen.X, headCircleScreen.Y),
+                        new Vector2(neckScreen.X, neckScreen.Y)
+                    );
+
+                    // Use config as multiplier for the natural head size
+                    // Config value controls how much larger/smaller than actual head
+                    float baseMultiplier = isAI ? cfg.EspAIHeadCircleSize : cfg.EspPlayerHeadCircleSize;
+                    float circleRadius = headNeckDist * baseMultiplier;
+
+                    canvas.DrawCircle(headCircleScreen, circleRadius, _boxPaint);
+                }
             }
 
             if (drawName && TryProject(player.GetBonePos(Bones.HumanHead), screenWidth, screenHeight, out var headScreen))
             {
-                DrawPlayerName(canvas, headScreen, player, distance);
+                DrawPlayerName(canvas, headScreen, player, distance, in cfg);
+
+                // TODO: Uncomment when health bar config is added
+                // Draw health bar above name if enabled
+                // if (drawHealthBar)
+                // {
+                //     DrawHealthBar(canvas, headScreen, player);
+                // }
             }
         }
 
@@ -573,15 +720,15 @@ namespace LoneEftDmaRadar.UI.ESP
             }
         }
 
-        private void DrawBoundingBox(SKCanvas canvas, AbstractPlayer player, float w, float h)
+        private void DrawBoundingBox(SKCanvas canvas, AbstractPlayer player, float w, float h, in ESPConfigCache cfg)
         {
             // Use stackalloc to avoid heap allocations
-            Span<SKPoint> projectedPoints = stackalloc SKPoint[32];
+            Span<SKPoint> projectedPoints = stackalloc SKPoint[MAX_SKELETON_BONES];
             int pointCount = 0;
 
             foreach (var boneKvp in player.PlayerBones)
             {
-                if (pointCount >= 32)
+                if (pointCount >= MAX_SKELETON_BONES)
                     break;
 
                 if (TryProject(boneKvp.Value.Position, w, h, out var s))
@@ -616,9 +763,38 @@ namespace LoneEftDmaRadar.UI.ESP
             minY = Math.Clamp(minY, -50f, h + 50f);
             maxY = Math.Clamp(maxY, -50f, h + 50f);
 
-            float padding = 2f;
-            var rect = new SKRect(minX - padding, minY - padding, maxX + padding, maxY + padding);
-            canvas.DrawRect(rect, _boxPaint);
+            minX -= BOX_PADDING;
+            minY -= BOX_PADDING;
+            maxX += BOX_PADDING;
+            maxY += BOX_PADDING;
+
+            if (cfg.EspCornerBoxes)
+            {
+                // Draw corner-style boxes (L-shaped corners)
+                float cornerLength = cfg.EspCornerLength;
+
+                // Top-left corner
+                canvas.DrawLine(minX, minY, minX + cornerLength, minY, _boxPaint);
+                canvas.DrawLine(minX, minY, minX, minY + cornerLength, _boxPaint);
+
+                // Top-right corner
+                canvas.DrawLine(maxX, minY, maxX - cornerLength, minY, _boxPaint);
+                canvas.DrawLine(maxX, minY, maxX, minY + cornerLength, _boxPaint);
+
+                // Bottom-left corner
+                canvas.DrawLine(minX, maxY, minX + cornerLength, maxY, _boxPaint);
+                canvas.DrawLine(minX, maxY, minX, maxY - cornerLength, _boxPaint);
+
+                // Bottom-right corner
+                canvas.DrawLine(maxX, maxY, maxX - cornerLength, maxY, _boxPaint);
+                canvas.DrawLine(maxX, maxY, maxX, maxY - cornerLength, _boxPaint);
+            }
+            else
+            {
+                // Draw full rectangle box
+                var rect = new SKRect(minX, minY, maxX, maxY);
+                canvas.DrawRect(rect, _boxPaint);
+            }
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -644,15 +820,31 @@ namespace LoneEftDmaRadar.UI.ESP
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private void DrawPlayerName(SKCanvas canvas, SKPoint screenPos, AbstractPlayer player, float distance)
+        private void DrawPlayerName(SKCanvas canvas, SKPoint screenPos, AbstractPlayer player, float distance, in ESPConfigCache cfg)
         {
             var name = player.Name ?? "Unknown";
             var text = $"{name} ({distance:F0}m)";
 
-            var textWidth = _textFont.MeasureText(text);
+            // Use cached text width if available
+            if (!_textWidthCache.TryGetValue(text, out var textWidth))
+            {
+                textWidth = _textFont.MeasureText(text);
+                _textWidthCache[text] = textWidth;
+            }
+
             var textHeight = _textFont.Size;
 
-            canvas.DrawText(text, screenPos.X - textWidth / 2, screenPos.Y - 20 + textHeight, _textFont, _textPaint);
+            var x = screenPos.X - textWidth / 2;
+            var y = screenPos.Y - PLAYER_NAME_OFFSET_Y + textHeight;
+
+            // Draw text outline if enabled
+            if (cfg.EspTextOutlines)
+            {
+                canvas.DrawText(text, x, y, _textFont, SKPaints.TextOutline);
+            }
+
+            // Draw text fill
+            canvas.DrawText(text, x, y, _textFont, _textPaint);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
@@ -665,15 +857,79 @@ namespace LoneEftDmaRadar.UI.ESP
             canvas.DrawText(text, x, y, SKTextAlign.Center, _notShownFont, _notShownPaint);
         }
 
-        private void DrawCrosshair(SKCanvas canvas, float width, float height)
+        private void DrawCrosshair(SKCanvas canvas, float width, float height, float crosshairLength)
         {
             float centerX = width / 2f;
             float centerY = height / 2f;
-            float length = MathF.Max(2f, App.Config.UI.EspCrosshairLength);
+            float length = MathF.Max(2f, crosshairLength);
 
             canvas.DrawLine(centerX - length, centerY, centerX + length, centerY, _crosshairPaint);
             canvas.DrawLine(centerX, centerY - length, centerX, centerY + length, _crosshairPaint);
         }
+
+        // TODO: Uncomment when health bar config is added to EftDmaConfig.cs
+        // and when HealthStatus property is available on AbstractPlayer (currently only on ObservedPlayer)
+        /*
+        private void DrawHealthBar(SKCanvas canvas, SKPoint screenPos, AbstractPlayer player)
+        {
+            const float barWidth = 50f;
+            const float barHeight = 4f;
+            const float barOffsetY = 30f; // Above the name
+
+            // Get health percentage from HealthStatus
+            float healthPercent = GetHealthPercent(player);
+
+            // Calculate bar position (centered above name)
+            float barX = screenPos.X - barWidth / 2;
+            float barY = screenPos.Y - barOffsetY;
+
+            // Background bar (darker)
+            var bgPaint = new SKPaint
+            {
+                Color = new SKColor(0, 0, 0, 180),
+                Style = SKPaintStyle.Fill
+            };
+            canvas.DrawRect(barX, barY, barWidth, barHeight, bgPaint);
+            bgPaint.Dispose();
+
+            // Health bar (color-coded)
+            float healthBarWidth = barWidth * healthPercent;
+            var healthColor = healthPercent switch
+            {
+                >= 0.7f => new SKColor(0, 255, 0),      // Green - Healthy
+                >= 0.4f => new SKColor(255, 255, 0),    // Yellow - Injured
+                >= 0.2f => new SKColor(255, 165, 0),    // Orange - Badly Injured
+                _ => new SKColor(255, 0, 0)             // Red - Dying
+            };
+
+            var healthPaint = new SKPaint
+            {
+                Color = healthColor,
+                Style = SKPaintStyle.Fill
+            };
+            canvas.DrawRect(barX, barY, healthBarWidth, barHeight, healthPaint);
+            healthPaint.Dispose();
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private float GetHealthPercent(AbstractPlayer player)
+        {
+            // Map HealthStatus enum to percentage
+            // This is a rough approximation based on the enum values
+            if (player is ObservedPlayer observed)
+            {
+                return observed.HealthStatus switch
+                {
+                    Enums.ETagStatus.Healthy => 1.0f,
+                    Enums.ETagStatus.Injured => 0.6f,
+                    Enums.ETagStatus.BadlyInjured => 0.3f,
+                    Enums.ETagStatus.Dying => 0.1f,
+                    _ => 1.0f // Default to healthy if unknown
+                };
+            }
+            return 1.0f; // Default to healthy for non-observed players
+        }
+        */
 
         private void DrawFPS(SKCanvas canvas, float width, float height)
         {
@@ -698,7 +954,7 @@ namespace LoneEftDmaRadar.UI.ESP
 
             float w = Vector3.Dot(_transposedViewMatrix.Translation, world) + _transposedViewMatrix.M44;
 
-            if (w < 0.098f)
+            if (w < W_COMPONENT_THRESHOLD)
                 return false;
 
             float x = Vector3.Dot(_transposedViewMatrix.Right, world) + _transposedViewMatrix.M14;
@@ -758,9 +1014,8 @@ namespace LoneEftDmaRadar.UI.ESP
                 float.IsNaN(screen.Y) || float.IsInfinity(screen.Y))
                 return false;
 
-            const float margin = 200f;
-            if (screen.X < -margin || screen.X > w + margin ||
-                screen.Y < -margin || screen.Y > h + margin)
+            if (screen.X < -SCREEN_MARGIN || screen.X > w + SCREEN_MARGIN ||
+                screen.Y < -SCREEN_MARGIN || screen.Y > h + SCREEN_MARGIN)
                 return false;
 
             return true;
@@ -842,15 +1097,6 @@ namespace LoneEftDmaRadar.UI.ESP
             _notShownPaint?.Dispose();
             _fpsFont?.Dispose();
             _fpsPaint?.Dispose();
-
-            // Dispose object pools
-            foreach (var path in _pathPool)
-                path.Dispose();
-            _pathPool.Clear();
-
-            foreach (var paint in _paintPool)
-                paint.Dispose();
-            _paintPool.Clear();
         }
 
         #endregion
