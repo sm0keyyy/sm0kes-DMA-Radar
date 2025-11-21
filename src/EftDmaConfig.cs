@@ -131,6 +131,13 @@ namespace LoneEftDmaRadar
         public InfoWidgetConfig InfoWidget { get; private set; } = new();
 
         /// <summary>
+        /// Aimbot Configuration.
+        /// </summary>
+        [JsonInclude]
+        [JsonPropertyName("aimbot")]
+        public Config.AimbotConfig Aimbot { get; private set; } = new();
+
+        /// <summary>
         /// Player Watchlist Collection.
         /// ** ONLY USE FOR BINDING **
         /// </summary>
