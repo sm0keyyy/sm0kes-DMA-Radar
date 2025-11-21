@@ -757,6 +757,13 @@ namespace LoneEftDmaRadar
         /// </summary>
         [JsonPropertyName("espTargetScreen")]
         public int EspTargetScreen { get; set; } = 0;
+
+        /// <summary>
+        /// Camera position smoothing factor (0.0 = disabled, 0.4 = balanced, 0.6 = maximum stability).
+        /// Reduces ESP jitter by interpolating camera movement. Higher values = smoother but slightly more lag.
+        /// </summary>
+        [JsonPropertyName("espCameraSmoothing")]
+        public float EspCameraSmoothing { get; set; } = 0.4f;
     }
 
     public sealed class LootConfig

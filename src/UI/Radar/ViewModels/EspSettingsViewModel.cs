@@ -546,6 +546,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public float EspCameraSmoothing
+        {
+            get => App.Config.UI.EspCameraSmoothing;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspCameraSmoothing - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspCameraSmoothing = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         protected void OnPropertyChanged([CallerMemberName] string propertyName = null)
         {
             PropertyChanged?.Invoke(this, new PropertyChangedEventArgs(propertyName));

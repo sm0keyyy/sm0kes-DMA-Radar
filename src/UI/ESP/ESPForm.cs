@@ -72,6 +72,11 @@ namespace LoneEftDmaRadar.UI.ESP
         // View matrix cache
         private TransposedViewMatrix _transposedViewMatrix = new();
 
+        // Camera smoothing state
+        private Vector3 _smoothedCamPos;
+        private Matrix4x4 _smoothedViewMatrix;
+        private bool _smoothingInitialized = false;
+
         /// <summary>
         /// LocalPlayer (who is running Radar) 'Player' object.
         /// </summary>
@@ -259,7 +264,7 @@ namespace LoneEftDmaRadar.UI.ESP
             {
                 Color = SKColors.White,
                 StrokeWidth = 1.0f,
-                IsAntialias = false,
+                IsAntialias = true,
                 Style = SKPaintStyle.Stroke
             };
 
@@ -958,8 +963,56 @@ namespace LoneEftDmaRadar.UI.ESP
         private void UpdateCameraPositionFromMatrix()
         {
             var viewMatrix = _cameraManager.ViewMatrix;
-            _camPos = new Vector3(viewMatrix.M14, viewMatrix.M24, viewMatrix.M34);
-            _transposedViewMatrix.Update(ref viewMatrix);
+            var rawCamPos = new Vector3(viewMatrix.M14, viewMatrix.M24, viewMatrix.M34);
+
+            float smoothingFactor = App.Config.UI.EspCameraSmoothing;
+
+            // Apply smoothing if enabled (smoothingFactor > 0)
+            if (smoothingFactor > 0f && smoothingFactor <= 1f && _smoothingInitialized)
+            {
+                // Lerp camera position
+                _smoothedCamPos = Vector3.Lerp(_smoothedCamPos, rawCamPos, smoothingFactor);
+
+                // Lerp view matrix components
+                _smoothedViewMatrix.M11 = Lerp(_smoothedViewMatrix.M11, viewMatrix.M11, smoothingFactor);
+                _smoothedViewMatrix.M12 = Lerp(_smoothedViewMatrix.M12, viewMatrix.M12, smoothingFactor);
+                _smoothedViewMatrix.M13 = Lerp(_smoothedViewMatrix.M13, viewMatrix.M13, smoothingFactor);
+                _smoothedViewMatrix.M14 = Lerp(_smoothedViewMatrix.M14, viewMatrix.M14, smoothingFactor);
+
+                _smoothedViewMatrix.M21 = Lerp(_smoothedViewMatrix.M21, viewMatrix.M21, smoothingFactor);
+                _smoothedViewMatrix.M22 = Lerp(_smoothedViewMatrix.M22, viewMatrix.M22, smoothingFactor);
+                _smoothedViewMatrix.M23 = Lerp(_smoothedViewMatrix.M23, viewMatrix.M23, smoothingFactor);
+                _smoothedViewMatrix.M24 = Lerp(_smoothedViewMatrix.M24, viewMatrix.M24, smoothingFactor);
+
+                _smoothedViewMatrix.M31 = Lerp(_smoothedViewMatrix.M31, viewMatrix.M31, smoothingFactor);
+                _smoothedViewMatrix.M32 = Lerp(_smoothedViewMatrix.M32, viewMatrix.M32, smoothingFactor);
+                _smoothedViewMatrix.M33 = Lerp(_smoothedViewMatrix.M33, viewMatrix.M33, smoothingFactor);
+                _smoothedViewMatrix.M34 = Lerp(_smoothedViewMatrix.M34, viewMatrix.M34, smoothingFactor);
+
+                _smoothedViewMatrix.M41 = Lerp(_smoothedViewMatrix.M41, viewMatrix.M41, smoothingFactor);
+                _smoothedViewMatrix.M42 = Lerp(_smoothedViewMatrix.M42, viewMatrix.M42, smoothingFactor);
+                _smoothedViewMatrix.M43 = Lerp(_smoothedViewMatrix.M43, viewMatrix.M43, smoothingFactor);
+                _smoothedViewMatrix.M44 = Lerp(_smoothedViewMatrix.M44, viewMatrix.M44, smoothingFactor);
+
+                _camPos = _smoothedCamPos;
+                _transposedViewMatrix.Update(ref _smoothedViewMatrix);
+            }
+            else
+            {
+                // No smoothing or first frame - use raw values
+                _smoothedCamPos = rawCamPos;
+                _smoothedViewMatrix = viewMatrix;
+                _smoothingInitialized = true;
+
+                _camPos = rawCamPos;
+                _transposedViewMatrix.Update(ref viewMatrix);
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static float Lerp(float a, float b, float t)
+        {
+            return a + (b - a) * t;
         }
 
         private bool WorldToScreen2(in Vector3 world, out SKPoint scr, float screenWidth, float screenHeight)
@@ -977,8 +1030,12 @@ namespace LoneEftDmaRadar.UI.ESP
             var centerX = screenWidth / 2f;
             var centerY = screenHeight / 2f;
 
-            scr.X = centerX * (1f + x / w);
-            scr.Y = centerY * (1f - y / w);
+            float screenX = centerX * (1f + x / w);
+            float screenY = centerY * (1f - y / w);
+
+            // Round to nearest 0.5 pixel to reduce sub-pixel jitter
+            scr.X = MathF.Round(screenX * 2f) * 0.5f;
+            scr.Y = MathF.Round(screenY * 2f) * 0.5f;
 
             return true;
         }
