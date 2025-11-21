@@ -100,31 +100,18 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Player
 
         public float GetFov()
         {
-            try
-            {
-                var hands = Memory.ReadPtr(Base + Offsets.Player.HandsController);
-                if (hands == 0) return 0f;
-                
-                var anim = Memory.ReadPtr(hands + Offsets.FirearmController.WeaponAnimation);
-                if (anim == 0) return 0f;
-
-                return Memory.ReadValue<float>(anim + Offsets.ProceduralWeaponAnimation._fieldOfView);
-            }
-            catch { return 0f; }
+            // TODO: HandsController offset removed in latest EFT version
+            // Need to find alternative way to get FOV
+            return 0f;
         }
 
         public ulong PWA
         {
             get
             {
-                try
-                {
-                    return Memory.ReadPtr(Base + Offsets.Player.ProceduralWeaponAnimation);
-                }
-                catch
-                {
-                    return 0;
-                }
+                // TODO: ProceduralWeaponAnimation offset removed in latest EFT version
+                // Need to find alternative way to get PWA
+                return 0;
             }
         }
 
