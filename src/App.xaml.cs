@@ -137,6 +137,12 @@ namespace LoneEftDmaRadar
 
                 MainWindow = new MainWindow();
                 MainWindow.Show();
+
+                // Auto-launch ESP if enabled in config (respects multi-monitor setup)
+                if (App.Config.UI.ShowESP)
+                {
+                    ESPManager.StartESP(); // Opens in fullscreen on configured screen
+                }
             }
             catch (Exception ex)
             {
