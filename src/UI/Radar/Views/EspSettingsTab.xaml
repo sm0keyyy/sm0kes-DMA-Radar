@@ -182,6 +182,20 @@
                                    VerticalAlignment="Center"
                                    Margin="8,0,0,0" />
                      </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0" IsEnabled="{Binding EspLootConeEnabled}">
+                        <TextBlock Text="Cone Max Distance (0 = Unlimited):" VerticalAlignment="Center" Margin="0,0,8,0"/>
+                        <Slider x:Name="LootConeDistanceSlider"
+                                Width="200"
+                                Margin="0,0,8,0"
+                                Minimum="0"
+                                Maximum="500"
+                                SmallChange="10"
+                                LargeChange="50"
+                                Value="{Binding EspLootConeMaxDistance, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=LootConeDistanceSlider, StringFormat='{}{0:F0}m'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="50"/>
+                     </WrapPanel>
                      <WrapPanel Margin="0,4,0,0">
                         <TextBlock Text="Max Distance (0 = Unlimited):" VerticalAlignment="Center" Margin="0,0,8,0"/>
                         <Slider x:Name="LootDistanceSlider"

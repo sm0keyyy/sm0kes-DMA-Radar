@@ -639,6 +639,12 @@ namespace LoneEftDmaRadar
         public float EspLootConeAngle { get; set; } = 15f;
 
         /// <summary>
+        /// Maximum distance for loot cone filter to work (in meters). 0 = unlimited.
+        /// </summary>
+        [JsonPropertyName("espLootConeMaxDistance")]
+        public float EspLootConeMaxDistance { get; set; } = 0f;
+
+        /// <summary>
         /// Show Food items on ESP.
         /// </summary>
         [JsonPropertyName("espFood")]

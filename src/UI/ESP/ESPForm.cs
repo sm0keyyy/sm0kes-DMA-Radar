@@ -133,6 +133,7 @@ namespace LoneEftDmaRadar.UI.ESP
             public readonly bool EspBackpacks;
             public readonly bool EspLootConeEnabled;
             public readonly float EspLootConeAngle;
+            public readonly float EspLootConeMaxDistance;
             public readonly bool EspLootPrice;
             public readonly float FOV;
             public readonly bool EspExfils;
@@ -171,6 +172,7 @@ namespace LoneEftDmaRadar.UI.ESP
                 EspBackpacks = App.Config.UI.EspBackpacks;
                 EspLootConeEnabled = App.Config.UI.EspLootConeEnabled;
                 EspLootConeAngle = App.Config.UI.EspLootConeAngle;
+                EspLootConeMaxDistance = App.Config.UI.EspLootConeMaxDistance;
                 EspLootPrice = App.Config.UI.EspLootPrice;
                 FOV = App.Config.UI.FOV;
                 EspExfils = App.Config.UI.EspExfils;
@@ -521,6 +523,8 @@ namespace LoneEftDmaRadar.UI.ESP
             float coneAngleSq = cfg.EspLootConeAngle * cfg.EspLootConeAngle;
             bool coneEnabled = cfg.EspLootConeEnabled && cfg.EspLootConeAngle > 0f;
             float maxDistSq = cfg.EspLootMaxDistance * cfg.EspLootMaxDistance;
+            float coneMaxDistSq = cfg.EspLootConeMaxDistance * cfg.EspLootConeMaxDistance;
+            bool coneDistanceRestricted = cfg.EspLootConeMaxDistance > 0f;
 
             foreach (var item in lootItems)
             {
@@ -556,12 +560,22 @@ namespace LoneEftDmaRadar.UI.ESP
 
                      if (coneEnabled)
                      {
-                         float dx = screen.X - centerX;
-                         float dy = screen.Y - centerY;
-                         float screenAngleX = MathF.Abs(dx * invCenterX) * halfFov;
-                         float screenAngleY = MathF.Abs(dy * invCenterY) * halfFov;
-                         float screenAngleSq = screenAngleX * screenAngleX + screenAngleY * screenAngleY;
-                         inCone = screenAngleSq <= coneAngleSq;  // Avoid sqrt
+                         // Only apply cone filter if item is within cone max distance (or unlimited)
+                         bool withinConeDistance = !coneDistanceRestricted || distSq <= coneMaxDistSq;
+
+                         if (withinConeDistance)
+                         {
+                             float dx = screen.X - centerX;
+                             float dy = screen.Y - centerY;
+                             float screenAngleX = MathF.Abs(dx * invCenterX) * halfFov;
+                             float screenAngleY = MathF.Abs(dy * invCenterY) * halfFov;
+                             float screenAngleSq = screenAngleX * screenAngleX + screenAngleY * screenAngleY;
+                             inCone = screenAngleSq <= coneAngleSq;  // Avoid sqrt
+                         }
+                         else
+                         {
+                             inCone = false; // Outside cone distance restriction
+                         }
                      }
 
                      var (circlePaint, textPaint) = item switch

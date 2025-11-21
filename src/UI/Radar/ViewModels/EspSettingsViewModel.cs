@@ -323,6 +323,19 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public float EspLootConeMaxDistance
+        {
+            get => App.Config.UI.EspLootConeMaxDistance;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspLootConeMaxDistance - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspLootConeMaxDistance = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public bool EspFood
         {
             get => App.Config.UI.EspFood;
