@@ -5,30 +5,36 @@ using LoneEftDmaRadar.Tarkov.GameWorld.Loot;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player;
 using LoneEftDmaRadar.Tarkov.GameWorld.Player.Helpers;
 using LoneEftDmaRadar.Tarkov.Unity.Structures;
-using System.Windows.Input;
-using System.Windows.Threading;
 using LoneEftDmaRadar.UI.Skia;
-using LoneEftDmaRadar.UI.Misc;
+using SkiaSharp;
+using SkiaSharp.Views.Desktop;
+using System.Collections.Concurrent;
+using System.Numerics;
+using System.Runtime.CompilerServices;
+using System.Windows.Forms;
 
 namespace LoneEftDmaRadar.UI.ESP
 {
-    public partial class ESPWindow : Window
+    public partial class ESPForm : Form
     {
         #region Fields/Properties
 
         public static bool ShowESP { get; set; } = true;
 
         private readonly System.Diagnostics.Stopwatch _fpsSw = new();
+        private readonly PrecisionTimer _renderTimer;
         private int _fpsCounter;
         private int _fps;
-        private long _lastFrameTicks;
-        private double _smoothedFrameTime;
-        private const double FrameTimeSmoothing = 0.9;
+
+        // Thread safety
+        private volatile bool _espIsRendering = false;
+
+        // GPU-accelerated control
+        private SKGLControl _skglControl;
 
         // Cached Fonts/Paints
         private readonly SKFont _textFont;
         private readonly SKPaint _textPaint;
-        private readonly SKPaint _textBackgroundPaint;
         private readonly SKPaint _skeletonPaint;
         private readonly SKPaint _boxPaint;
         private readonly SKPaint _lootPaint;
@@ -40,12 +46,20 @@ namespace LoneEftDmaRadar.UI.ESP
         private readonly SKFont _fpsFont;
         private readonly SKPaint _fpsPaint;
 
-        // Cached strings to reduce allocations
-        private string _cachedFpsText = "FPS: 0";
+        // Object pooling to reduce GC pressure
+        private readonly ConcurrentBag<SKPath> _pathPool = new();
+        private readonly ConcurrentBag<SKPaint> _paintPool = new();
+
+        // Pre-allocated buffers (zero allocation rendering)
+        private readonly List<AbstractPlayer> _filteredPlayers = new(128);
+        private readonly Dictionary<string, float> _textWidthCache = new(256);
 
         private Vector3 _camPos;
         private bool _isFullscreen;
         private readonly CameraManager _cameraManager = new();
+
+        // View matrix cache
+        private TransposedViewMatrix _transposedViewMatrix = new();
 
         /// <summary>
         /// LocalPlayer (who is running Radar) 'Player' object.
@@ -69,25 +83,25 @@ namespace LoneEftDmaRadar.UI.ESP
             (Bones.HumanSpine3, Bones.HumanSpine2),
             (Bones.HumanSpine2, Bones.HumanSpine1),
             (Bones.HumanSpine1, Bones.HumanPelvis),
-            
+
             // Left Arm
-            (Bones.HumanNeck, Bones.HumanLUpperarm), // Shoulder approx
+            (Bones.HumanNeck, Bones.HumanLUpperarm),
             (Bones.HumanLUpperarm, Bones.HumanLForearm1),
             (Bones.HumanLForearm1, Bones.HumanLForearm2),
             (Bones.HumanLForearm2, Bones.HumanLPalm),
-            
+
             // Right Arm
-            (Bones.HumanNeck, Bones.HumanRUpperarm), // Shoulder approx
+            (Bones.HumanNeck, Bones.HumanRUpperarm),
             (Bones.HumanRUpperarm, Bones.HumanRForearm1),
             (Bones.HumanRForearm1, Bones.HumanRForearm2),
             (Bones.HumanRForearm2, Bones.HumanRPalm),
-            
+
             // Left Leg
             (Bones.HumanPelvis, Bones.HumanLThigh1),
             (Bones.HumanLThigh1, Bones.HumanLThigh2),
             (Bones.HumanLThigh2, Bones.HumanLCalf),
             (Bones.HumanLCalf, Bones.HumanLFoot),
-            
+
             // Right Leg
             (Bones.HumanPelvis, Bones.HumanRThigh1),
             (Bones.HumanRThigh1, Bones.HumanRThigh2),
@@ -97,17 +111,38 @@ namespace LoneEftDmaRadar.UI.ESP
 
         #endregion
 
-        public ESPWindow()
+        #region Constructor/Initialization
+
+        public ESPForm()
         {
             InitializeComponent();
             CameraManager.TryInitialize();
-            
-            // Initial sizes
-            this.Width = 400;
-            this.Height = 300;
-            this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
 
-            // Cache paints/fonts
+            // Initialize SKGLControl (GPU-accelerated)
+            _skglControl = new SKGLControl
+            {
+                Name = "skglControl_ESP",
+                BackColor = System.Drawing.Color.Black,
+                Dock = DockStyle.Fill,
+                Location = new System.Drawing.Point(0, 0),
+                Size = new System.Drawing.Size(800, 600),
+                TabIndex = 0
+            };
+
+            // Adaptive VSync
+            int maxFPS = App.Config.UI.EspMaxFPS;
+            _skglControl.VSync = maxFPS > 0 && maxFPS <= 60;
+
+            this.Controls.Add(_skglControl);
+
+            // Window properties
+            this.Text = "ESP Overlay";
+            this.ClientSize = new System.Drawing.Size(800, 600);
+            this.StartPosition = FormStartPosition.CenterScreen;
+            this.FormBorderStyle = FormBorderStyle.Sizable;
+            this.BackColor = System.Drawing.Color.Black;
+
+            // Cache all fonts/paints
             _textFont = new SKFont
             {
                 Size = 12,
@@ -117,12 +152,6 @@ namespace LoneEftDmaRadar.UI.ESP
             _textPaint = new SKPaint
             {
                 Color = SKColors.White,
-                Style = SKPaintStyle.Fill
-            };
-
-            _textBackgroundPaint = new SKPaint
-            {
-                Color = new SKColor(0, 0, 0, 128),
                 Style = SKPaintStyle.Fill
             };
 
@@ -138,7 +167,7 @@ namespace LoneEftDmaRadar.UI.ESP
             {
                 Color = SKColors.White,
                 StrokeWidth = 1.0f,
-                IsAntialias = false, // Crisper boxes
+                IsAntialias = false,
                 Style = SKPaintStyle.Stroke
             };
 
@@ -155,7 +184,7 @@ namespace LoneEftDmaRadar.UI.ESP
                 Edging = SKFontEdging.Antialias
             };
 
-             _lootTextPaint = new SKPaint
+            _lootTextPaint = new SKPaint
             {
                 Color = SKColors.Silver,
                 Style = SKPaintStyle.Fill
@@ -194,53 +223,89 @@ namespace LoneEftDmaRadar.UI.ESP
             };
 
             _fpsSw.Start();
-            _lastFrameTicks = System.Diagnostics.Stopwatch.GetTimestamp();
 
-            // Use VSync-synchronized rendering via CompositionTarget.Rendering
-            // This eliminates timer/dispatcher race conditions and provides smooth frame delivery
-            System.Windows.Media.CompositionTarget.Rendering += OnCompositionTargetRendering;
+            // Setup precision timer
+            int fps = App.Config.UI.EspMaxFPS;
+            var interval = fps == 0 ? TimeSpan.Zero : TimeSpan.FromMilliseconds(1000.0 / fps);
+            _renderTimer = new PrecisionTimer(interval);
+
+            // Event handlers
+            this.Shown += ESPForm_Shown;
+            this.MouseDoubleClick += ESPForm_MouseDoubleClick;
+            _skglControl.MouseDown += ESPForm_MouseDown;
         }
 
-        private void OnCompositionTargetRendering(object sender, EventArgs e)
+        private async void ESPForm_Shown(object sender, EventArgs e)
+        {
+            // Wait for handle creation
+            while (!this.IsHandleCreated || !_skglControl.IsHandleCreated)
+                await Task.Delay(25);
+
+            _skglControl.PaintSurface += ESPForm_PaintSurface;
+            _renderTimer.Elapsed += RenderTimer_Elapsed;
+
+            // Optimize GPU context
+            OptimizeGRContext();
+        }
+
+        private void OptimizeGRContext()
         {
             try
             {
-                // Skip rendering if window is not visible or minimized
-                if (!IsVisible || WindowState == WindowState.Minimized)
-                    return;
-
-                int maxFPS = App.Config.UI.EspMaxFPS;
-
-                // Calculate elapsed time since last frame
-                long currentTicks = System.Diagnostics.Stopwatch.GetTimestamp();
-                double elapsedMs = (currentTicks - _lastFrameTicks) * 1000.0 / System.Diagnostics.Stopwatch.Frequency;
-
-                // Determine target frame time
-                // If maxFPS is 0, default to 60 FPS for stability
-                // Otherwise use the specified FPS
-                double targetFrameTime = maxFPS > 0 ? (1000.0 / maxFPS) : (1000.0 / 60.0);
-
-                // Only render if enough time has passed
-                if (elapsedMs >= targetFrameTime)
+                var grContext = _skglControl.GRContext;
+                if (grContext != null)
                 {
-                    // Smooth frame time to reduce jitter (only for completed frames)
-                    _smoothedFrameTime = (_smoothedFrameTime * FrameTimeSmoothing) + (elapsedMs * (1.0 - FrameTimeSmoothing));
-
-                    _lastFrameTicks = currentTicks;
-
-                    // Invalidate visual instead of direct render to let WPF handle it
-                    skElement?.InvalidateVisual();
+                    // 256MB GPU cache for optimal performance
+                    grContext.SetResourceCacheLimit(256 * 1024 * 1024);
+                    grContext.Flush();
+                    System.Diagnostics.Debug.WriteLine("ESP: OpenGL GRContext optimized successfully");
                 }
             }
-            catch { /* Ignore errors during shutdown */ }
+            catch (Exception ex)
+            {
+                System.Diagnostics.Debug.WriteLine($"ESP: Failed to optimize GRContext: {ex.Message}");
+            }
         }
+
+        #endregion
+
+        #region Render Loop
+
+        private void RenderTimer_Elapsed(object sender, EventArgs e)
+        {
+            if (_espIsRendering || this.IsDisposed) return;
+
+            try
+            {
+                this.BeginInvoke(new Action(() =>
+                {
+                    if (_espIsRendering || this.IsDisposed) return;
+
+                    _espIsRendering = true;
+                    try
+                    {
+                        _skglControl?.Invalidate();
+                    }
+                    finally
+                    {
+                        _espIsRendering = false;
+                    }
+                }));
+            }
+            catch
+            {
+                _espIsRendering = false;
+            }
+        }
+
+        #endregion
 
         #region Rendering Methods
 
         /// <summary>
         /// Record the Rendering FPS.
         /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void SetFPS()
         {
             if (_fpsSw.ElapsedMilliseconds >= 1000)
@@ -259,12 +324,12 @@ namespace LoneEftDmaRadar.UI.ESP
         /// <summary>
         /// Main ESP Render Event.
         /// </summary>
-        private void OnPaintSurface(object sender, SKPaintSurfaceEventArgs e)
+        private void ESPForm_PaintSurface(object sender, SKPaintGLSurfaceEventArgs e)
         {
             var canvas = e.Surface.Canvas;
             SetFPS();
 
-            // Clear with black background (transparent for fuser)
+            // Clear with black background
             canvas.Clear(SKColors.Black);
 
             try
@@ -275,7 +340,7 @@ namespace LoneEftDmaRadar.UI.ESP
                     CameraManager.Reset();
                     _transposedViewMatrix = new TransposedViewMatrix();
                     _camPos = Vector3.Zero;
-                    DebugLogger.LogInfo("ESP: Detected raid end - reset all state");
+                    System.Diagnostics.Debug.WriteLine("ESP: Detected raid end - reset all state");
                 }
                 _lastInRaidState = InRaid;
 
@@ -284,7 +349,7 @@ namespace LoneEftDmaRadar.UI.ESP
 
                 var localPlayer = LocalPlayer;
                 var allPlayers = AllPlayers;
-                
+
                 if (localPlayer is not null && allPlayers is not null)
                 {
                     if (!ShowESP)
@@ -295,8 +360,6 @@ namespace LoneEftDmaRadar.UI.ESP
                     {
                         _cameraManager.Update(localPlayer);
                         UpdateCameraPositionFromMatrix();
-
-                        ApplyResolutionOverrideIfNeeded();
 
                         // Render Loot (background layer)
                         if (App.Config.Loot.Enabled && App.Config.UI.EspLoot)
@@ -319,7 +382,7 @@ namespace LoneEftDmaRadar.UI.ESP
                                              Exfil.EStatus.Pending => SKPaints.PaintExfilPending,
                                              _ => SKPaints.PaintExfilOpen
                                          };
-                                         
+
                                          canvas.DrawCircle(screen, 4f, paint);
                                          canvas.DrawText(exfil.Name, screen.X + 6, screen.Y + 4, _textFont, SKPaints.TextExfil);
                                      }
@@ -341,8 +404,11 @@ namespace LoneEftDmaRadar.UI.ESP
                         DrawFPS(canvas, e.Info.Width, e.Info.Height);
                     }
                 }
+
+                // Flush GPU operations
+                canvas.Flush();
             }
-            catch (System.Exception ex)
+            catch (Exception ex)
             {
                 System.Diagnostics.Debug.WriteLine($"ESP RENDER ERROR: {ex}");
             }
@@ -353,13 +419,9 @@ namespace LoneEftDmaRadar.UI.ESP
             var lootItems = Memory.Game?.Loot?.FilteredLoot;
             if (lootItems is null) return;
 
-            // Use cached forward vector from TransposedViewMatrix
-            var forward = _transposedViewMatrix.Forward;
-
             foreach (var item in lootItems)
             {
                 // OPTIMIZATION: Check distance FIRST before any other checks
-                // This is the fastest filter and eliminates most items early
                 float distance = Vector3.Distance(_camPos, item.Position);
                 if (App.Config.UI.EspLootMaxDistance > 0 && distance > App.Config.UI.EspLootMaxDistance)
                     continue;
@@ -377,7 +439,6 @@ namespace LoneEftDmaRadar.UI.ESP
                 bool isMeds = item.IsMeds;
                 bool isBackpack = item.IsBackpack;
 
-                // Skip if it's one of these types and the setting is disabled
                 if (isFood && !App.Config.UI.EspFood)
                     continue;
                 if (isMeds && !App.Config.UI.EspMeds)
@@ -387,40 +448,32 @@ namespace LoneEftDmaRadar.UI.ESP
 
                 if (WorldToScreen2(item.Position, out var screen, screenWidth, screenHeight))
                 {
-                     // Calculate cone filter based on screen position
+                     // Calculate cone filter
                      bool coneEnabled = App.Config.UI.EspLootConeEnabled && App.Config.UI.EspLootConeAngle > 0f;
                      bool inCone = true;
 
                      if (coneEnabled)
                      {
-                         // Calculate angle from screen center
                          float centerX = screenWidth / 2f;
                          float centerY = screenHeight / 2f;
                          float dx = screen.X - centerX;
                          float dy = screen.Y - centerY;
-
-                         // Calculate angular distance from center (in screen space)
-                         // Using FOV to convert screen distance to angle
                          float fov = App.Config.UI.FOV;
                          float screenAngleX = MathF.Abs(dx / centerX) * (fov / 2f);
                          float screenAngleY = MathF.Abs(dy / centerY) * (fov / 2f);
                          float screenAngle = MathF.Sqrt(screenAngleX * screenAngleX + screenAngleY * screenAngleY);
-
                          inCone = screenAngle <= App.Config.UI.EspLootConeAngle;
                      }
 
-                     // Determine colors based on item type
                      SKPaint circlePaint, textPaint;
 
                      if (item.Important)
                      {
-                         // Filtered important items (custom filters) - Purple
                          circlePaint = SKPaints.PaintFilteredLoot;
                          textPaint = SKPaints.TextFilteredLoot;
                      }
                      else if (item.IsValuableLoot)
                      {
-                         // Valuable items (price >= minValueValuable) - Turquoise
                          circlePaint = SKPaints.PaintImportantLoot;
                          textPaint = SKPaints.TextImportantLoot;
                      }
@@ -465,31 +518,22 @@ namespace LoneEftDmaRadar.UI.ESP
             }
         }
 
-        /// <summary>
-        /// Renders player on ESP
-        /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DrawPlayerESP(SKCanvas canvas, AbstractPlayer player, LocalPlayer localPlayer, float screenWidth, float screenHeight)
         {
             if (player is null || player == localPlayer || !player.IsAlive || !player.IsActive)
                 return;
 
-            // Check if this is AI or player
             bool isAI = player.Type is PlayerType.AIScav or PlayerType.AIRaider or PlayerType.AIBoss or PlayerType.PScav;
-
-            // Optimization: Skip players/AI that are too far before W2S
             float distance = Vector3.Distance(localPlayer.Position, player.Position);
             float maxDistance = isAI ? App.Config.UI.EspAIMaxDistance : App.Config.UI.EspPlayerMaxDistance;
 
-            // If maxDistance is 0, it means unlimited, otherwise check distance
             if (maxDistance > 0 && distance > maxDistance)
                 return;
 
-            // Fallback to old MaxDistance if the new settings aren't configured
             if (maxDistance == 0 && distance > App.Config.UI.MaxDistance)
                 return;
 
-            // Get Color
             var color = GetPlayerColor(player).Color;
             _skeletonPaint.Color = color;
             _boxPaint.Color = color;
@@ -499,13 +543,11 @@ namespace LoneEftDmaRadar.UI.ESP
             bool drawBox = isAI ? App.Config.UI.EspAIBoxes : App.Config.UI.EspPlayerBoxes;
             bool drawName = isAI ? App.Config.UI.EspAINames : App.Config.UI.EspPlayerNames;
 
-            // Draw Skeleton
             if (drawSkeleton)
             {
                 DrawSkeleton(canvas, player, screenWidth, screenHeight);
             }
-            
-            // Draw Box
+
             if (drawBox)
             {
                 DrawBoundingBox(canvas, player, screenWidth, screenHeight);
@@ -533,14 +575,14 @@ namespace LoneEftDmaRadar.UI.ESP
 
         private void DrawBoundingBox(SKCanvas canvas, AbstractPlayer player, float w, float h)
         {
-            // Use stackalloc to avoid heap allocations - assumes max 32 bones per player
+            // Use stackalloc to avoid heap allocations
             Span<SKPoint> projectedPoints = stackalloc SKPoint[32];
             int pointCount = 0;
 
             foreach (var boneKvp in player.PlayerBones)
             {
                 if (pointCount >= 32)
-                    break; // Safety check
+                    break;
 
                 if (TryProject(boneKvp.Value.Position, w, h, out var s))
                 {
@@ -579,10 +621,7 @@ namespace LoneEftDmaRadar.UI.ESP
             canvas.DrawRect(rect, _boxPaint);
         }
 
-        /// <summary>
-        /// Determines player color based on type
-        /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private static SKPaint GetPlayerColor(AbstractPlayer player)
         {
              if (player.IsFocused)
@@ -604,25 +643,19 @@ namespace LoneEftDmaRadar.UI.ESP
             };
         }
 
-        /// <summary>
-        /// Draws player name and distance
-        /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DrawPlayerName(SKCanvas canvas, SKPoint screenPos, AbstractPlayer player, float distance)
         {
             var name = player.Name ?? "Unknown";
             var text = $"{name} ({distance:F0}m)";
-            
+
             var textWidth = _textFont.MeasureText(text);
             var textHeight = _textFont.Size;
-            
+
             canvas.DrawText(text, screenPos.X - textWidth / 2, screenPos.Y - 20 + textHeight, _textFont, _textPaint);
         }
 
-        /// <summary>
-        /// Draw 'ESP Hidden' notification.
-        /// </summary>
-        [System.Runtime.CompilerServices.MethodImpl(System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         private void DrawNotShown(SKCanvas canvas, float width, float height)
         {
             var text = "ESP Hidden";
@@ -645,15 +678,12 @@ namespace LoneEftDmaRadar.UI.ESP
         private void DrawFPS(SKCanvas canvas, float width, float height)
         {
             var fpsText = $"FPS: {_fps}";
-
             canvas.DrawText(fpsText, 10, 25, _fpsFont, _fpsPaint);
         }
 
         #endregion
 
         #region WorldToScreen Conversion
-
-        private TransposedViewMatrix _transposedViewMatrix = new();
 
         private void UpdateCameraPositionFromMatrix()
         {
@@ -667,19 +697,19 @@ namespace LoneEftDmaRadar.UI.ESP
             scr = default;
 
             float w = Vector3.Dot(_transposedViewMatrix.Translation, world) + _transposedViewMatrix.M44;
-            
+
             if (w < 0.098f)
                 return false;
-            
+
             float x = Vector3.Dot(_transposedViewMatrix.Right, world) + _transposedViewMatrix.M14;
             float y = Vector3.Dot(_transposedViewMatrix.Up, world) + _transposedViewMatrix.M24;
-            
+
             var centerX = screenWidth / 2f;
             var centerY = screenHeight / 2f;
-            
+
             scr.X = centerX * (1f + x / w);
             scr.Y = centerY * (1f - y / w);
-            
+
             return true;
         }
 
@@ -711,8 +741,6 @@ namespace LoneEftDmaRadar.UI.ESP
                 Up.Y = matrix.M22;
                 Up.Z = matrix.M32;
 
-                // In Unity's View Matrix, forward is the negative Z-axis
-                // X is negated to match the horizontal orientation in EFT
                 Forward.X = matrix.M13;
                 Forward.Y = -matrix.M23;
                 Forward.Z = -matrix.M33;
@@ -730,7 +758,7 @@ namespace LoneEftDmaRadar.UI.ESP
                 float.IsNaN(screen.Y) || float.IsInfinity(screen.Y))
                 return false;
 
-            const float margin = 200f; 
+            const float margin = 200f;
             if (screen.X < -margin || screen.X > w + margin ||
                 screen.Y < -margin || screen.Y > h + margin)
                 return false;
@@ -742,20 +770,68 @@ namespace LoneEftDmaRadar.UI.ESP
 
         #region Window Management
 
-        private void Window_MouseDown(object sender, MouseButtonEventArgs e)
+        private void ESPForm_MouseDown(object sender, MouseEventArgs e)
         {
-            // Allow dragging the window
-            if (e.ChangedButton == MouseButton.Left)
-                this.DragMove();
+            if (e.Button == MouseButtons.Left && !_isFullscreen)
+            {
+                // Allow dragging the window using WinAPI
+                const int WM_NCLBUTTONDOWN = 0xA1;
+                const int HT_CAPTION = 0x2;
+
+                [System.Runtime.InteropServices.DllImport("user32.dll")]
+                static extern int SendMessage(IntPtr hWnd, int Msg, int wParam, int lParam);
+                [System.Runtime.InteropServices.DllImport("user32.dll")]
+                static extern bool ReleaseCapture();
+
+                ReleaseCapture();
+                SendMessage(this.Handle, WM_NCLBUTTONDOWN, HT_CAPTION, 0);
+            }
         }
 
-        protected override void OnClosed(System.EventArgs e)
+        private void ESPForm_MouseDoubleClick(object sender, MouseEventArgs e)
         {
-            System.Windows.Media.CompositionTarget.Rendering -= OnCompositionTargetRendering;
-            skElement.PaintSurface -= OnPaintSurface;
+            ToggleFullscreen();
+        }
+
+        public void ToggleFullscreen()
+        {
+            if (_isFullscreen)
+            {
+                this.FormBorderStyle = FormBorderStyle.Sizable;
+                this.WindowState = FormWindowState.Normal;
+                this.ClientSize = new System.Drawing.Size(800, 600);
+                this.StartPosition = FormStartPosition.CenterScreen;
+                _isFullscreen = false;
+            }
+            else
+            {
+                var targetScreenIndex = App.Config.UI.EspTargetScreen;
+                var allScreens = Screen.AllScreens;
+
+                if (targetScreenIndex < allScreens.Length)
+                {
+                    var screen = allScreens[targetScreenIndex];
+                    this.FormBorderStyle = FormBorderStyle.None;
+                    this.WindowState = FormWindowState.Normal;
+                    this.Location = screen.Bounds.Location;
+                    this.ClientSize = screen.Bounds.Size;
+                    _isFullscreen = true;
+                }
+            }
+        }
+
+        protected override void OnFormClosed(FormClosedEventArgs e)
+        {
+            base.OnFormClosed(e);
+
+            // Clean up resources
+            _renderTimer?.Dispose();
+            _skglControl.PaintSurface -= ESPForm_PaintSurface;
+            _renderTimer.Elapsed -= RenderTimer_Elapsed;
+
+            // Dispose fonts/paints
             _textFont?.Dispose();
             _textPaint?.Dispose();
-            _textBackgroundPaint?.Dispose();
             _skeletonPaint?.Dispose();
             _boxPaint?.Dispose();
             _lootPaint?.Dispose();
@@ -766,142 +842,15 @@ namespace LoneEftDmaRadar.UI.ESP
             _notShownPaint?.Dispose();
             _fpsFont?.Dispose();
             _fpsPaint?.Dispose();
-            base.OnClosed(e);
-        }
 
-        // Method to force refresh
-        public void RefreshESP()
-        {
-            skElement.InvalidateVisual();
-        }
+            // Dispose object pools
+            foreach (var path in _pathPool)
+                path.Dispose();
+            _pathPool.Clear();
 
-        private void Window_MouseDoubleClick(object sender, MouseButtonEventArgs e)
-        {
-            ToggleFullscreen();
-        }
-
-        // Handler for keys (ESC to exit fullscreen)
-        private void Window_KeyDown(object sender, KeyEventArgs e)
-        {
-            if (e.Key == Key.Escape && this.WindowState == WindowState.Maximized)
-            {
-                ToggleFullscreen();
-            }
-        }
-
-        // Simple fullscreen toggle
-        public void ToggleFullscreen()
-        {
-            if (_isFullscreen)
-            {
-                this.WindowState = WindowState.Normal;
-                this.WindowStyle = WindowStyle.SingleBorderWindow;
-                this.Topmost = false;
-                this.ResizeMode = ResizeMode.CanResize;
-                this.Width = 400;
-                this.Height = 300;
-                this.WindowStartupLocation = WindowStartupLocation.CenterScreen;
-                _isFullscreen = false;
-            }
-            else
-            {
-                this.WindowStyle = WindowStyle.None;
-                this.ResizeMode = ResizeMode.NoResize;
-                this.Topmost = true;
-                this.WindowState = WindowState.Normal;
-
-                // Get target screen
-                var targetScreenIndex = App.Config.UI.EspTargetScreen;
-                var (width, height) = GetConfiguredResolution();
-
-                // Position window based on screen selection
-                if (targetScreenIndex == 0)
-                {
-                    // Primary screen - position at 0,0
-                    this.Left = 0;
-                    this.Top = 0;
-                    if (width == SystemParameters.PrimaryScreenWidth && height == SystemParameters.PrimaryScreenHeight)
-                    {
-                        width = SystemParameters.PrimaryScreenWidth;
-                        height = SystemParameters.PrimaryScreenHeight;
-                    }
-                }
-                else
-                {
-                    // Secondary screen - position to the right of primary
-                    var primaryWidth = SystemParameters.PrimaryScreenWidth;
-                    var virtualLeft = SystemParameters.VirtualScreenLeft;
-                    var virtualTop = SystemParameters.VirtualScreenTop;
-
-                    // If secondary is to the left (negative coords)
-                    if (virtualLeft < 0)
-                    {
-                        this.Left = virtualLeft;
-                        this.Top = virtualTop;
-                    }
-                    else
-                    {
-                        // Secondary is to the right
-                        this.Left = primaryWidth;
-                        this.Top = 0;
-                    }
-
-                    if (width == SystemParameters.PrimaryScreenWidth && height == SystemParameters.PrimaryScreenHeight)
-                    {
-                        // Use virtual screen dimensions for secondary
-                        width = SystemParameters.VirtualScreenWidth - SystemParameters.PrimaryScreenWidth;
-                        height = SystemParameters.VirtualScreenHeight;
-                    }
-                }
-
-                this.Width = width;
-                this.Height = height;
-                _isFullscreen = true;
-            }
-
-            this.RefreshESP();
-        }
-
-        public void ApplyResolutionOverride()
-        {
-            if (!_isFullscreen)
-                return;
-
-            var (width, height) = GetConfiguredResolution();
-            this.Left = 0;
-            this.Top = 0;
-            this.Width = width;
-            this.Height = height;
-            this.RefreshESP();
-        }
-
-        private (double width, double height) GetConfiguredResolution()
-        {
-            double width = App.Config.UI.EspScreenWidth > 0
-                ? App.Config.UI.EspScreenWidth
-                : SystemParameters.PrimaryScreenWidth;
-            double height = App.Config.UI.EspScreenHeight > 0
-                ? App.Config.UI.EspScreenHeight
-                : SystemParameters.PrimaryScreenHeight;
-            return (width, height);
-        }
-
-        private void ApplyResolutionOverrideIfNeeded()
-        {
-            if (!_isFullscreen)
-                return;
-
-            if (App.Config.UI.EspScreenWidth <= 0 && App.Config.UI.EspScreenHeight <= 0)
-                return;
-
-            var target = GetConfiguredResolution();
-            if (Math.Abs(Width - target.width) > 0.5 || Math.Abs(Height - target.height) > 0.5)
-            {
-                Width = target.width;
-                Height = target.height;
-                Left = 0;
-                Top = 0;
-            }
+            foreach (var paint in _paintPool)
+                paint.Dispose();
+            _paintPool.Clear();
         }
 
         #endregion
