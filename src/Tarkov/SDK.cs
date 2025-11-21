@@ -57,10 +57,12 @@ namespace SDK
         public readonly partial struct Player
         {
             public const uint MovementContext = 0x60; // EFT.MovementContext
-            public const uint _playerBody = 0x190; // EFT.PlayerBody
+            public const uint _playerBody = 0x158; // EFT.PlayerBody
+            public const uint ProceduralWeaponAnimation = 0x370; // EFT.Animations.ProceduralWeaponAnimation
             public const uint Corpse = 0x640; // EFT.Interactive.Corpse
             public const uint Location = 0x860; // String
-            public const uint Profile = 0x8D8; // EFT.Profile
+            public const uint Profile = 0x8C0; // EFT.Profile
+            public const uint _handsController = 0x940; // EFT.Player.AbstractHandsController
         }
 
         public readonly partial struct FirearmController
