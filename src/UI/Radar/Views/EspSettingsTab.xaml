@@ -79,6 +79,7 @@
                         <CheckBox Content="Skeleton" IsChecked="{Binding EspPlayerSkeletons, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Names" IsChecked="{Binding EspPlayerNames, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Head Circle" IsChecked="{Binding EspPlayerHeadCircles, Mode=TwoWay}" Margin="0,0,16,8" />
+                        <CheckBox Content="Upper Body Outline" IsChecked="{Binding EspPlayerUpperBodyOutline, Mode=TwoWay}" Margin="0,0,16,8" />
                      </WrapPanel>
                      <WrapPanel Margin="0,4,0,0">
                         <TextBlock Text="Head Circle Size:" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -91,6 +92,48 @@
                                 LargeChange="2"
                                 Value="{Binding EspPlayerHeadCircleSize, Mode=TwoWay}"/>
                         <TextBlock Text="{Binding Value, ElementName=PlayerHeadCircleSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Upper Body Outline Size:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="PlayerUpperBodyOutlineSizeSlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.5"
+                                Maximum="3.0"
+                                SmallChange="0.1"
+                                LargeChange="0.5"
+                                Value="{Binding EspPlayerUpperBodyOutlineSize, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=PlayerUpperBodyOutlineSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Outline Base Opacity:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="PlayerOutlineBaseOpacitySlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.1"
+                                Maximum="0.6"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Value="{Binding EspPlayerOutlineBaseOpacity, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=PlayerOutlineBaseOpacitySlider, StringFormat='{}{0:P0}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Outline Visible Opacity:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="PlayerOutlineVisibleOpacitySlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.5"
+                                Maximum="1.0"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Value="{Binding EspPlayerOutlineVisibleOpacity, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=PlayerOutlineVisibleOpacitySlider, StringFormat='{}{0:P0}'}"
                                    VerticalAlignment="Center"
                                    MinWidth="30"/>
                      </WrapPanel>
@@ -118,6 +161,7 @@
                         <CheckBox Content="Skeleton" IsChecked="{Binding EspAISkeletons, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Names" IsChecked="{Binding EspAINames, Mode=TwoWay}" Margin="0,0,16,8" />
                         <CheckBox Content="Head Circle" IsChecked="{Binding EspAIHeadCircles, Mode=TwoWay}" Margin="0,0,16,8" />
+                        <CheckBox Content="Upper Body Outline" IsChecked="{Binding EspAIUpperBodyOutline, Mode=TwoWay}" Margin="0,0,16,8" />
                      </WrapPanel>
                      <WrapPanel Margin="0,4,0,0">
                         <TextBlock Text="Head Circle Size:" VerticalAlignment="Center" Margin="0,0,8,0"/>
@@ -130,6 +174,48 @@
                                 LargeChange="2"
                                 Value="{Binding EspAIHeadCircleSize, Mode=TwoWay}"/>
                         <TextBlock Text="{Binding Value, ElementName=AIHeadCircleSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Upper Body Outline Size:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="AIUpperBodyOutlineSizeSlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.5"
+                                Maximum="3.0"
+                                SmallChange="0.1"
+                                LargeChange="0.5"
+                                Value="{Binding EspAIUpperBodyOutlineSize, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=AIUpperBodyOutlineSizeSlider, StringFormat='{}{0:F1}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Outline Base Opacity:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="AIOutlineBaseOpacitySlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.1"
+                                Maximum="0.6"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Value="{Binding EspAIOutlineBaseOpacity, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=AIOutlineBaseOpacitySlider, StringFormat='{}{0:P0}'}"
+                                   VerticalAlignment="Center"
+                                   MinWidth="30"/>
+                     </WrapPanel>
+                     <WrapPanel Margin="0,4,0,0">
+                        <TextBlock Text="Outline Visible Opacity:" VerticalAlignment="Center" Margin="0,0,8,0" Width="140"/>
+                        <Slider x:Name="AIOutlineVisibleOpacitySlider"
+                                Width="150"
+                                Margin="0,0,8,0"
+                                Minimum="0.5"
+                                Maximum="1.0"
+                                SmallChange="0.05"
+                                LargeChange="0.1"
+                                Value="{Binding EspAIOutlineVisibleOpacity, Mode=TwoWay}"/>
+                        <TextBlock Text="{Binding Value, ElementName=AIOutlineVisibleOpacitySlider, StringFormat='{}{0:P0}'}"
                                    VerticalAlignment="Center"
                                    MinWidth="30"/>
                      </WrapPanel>

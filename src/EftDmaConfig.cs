@@ -616,6 +616,54 @@ namespace LoneEftDmaRadar
         public float EspAIHeadCircleSize { get; set; } = 5f;
 
         /// <summary>
+        /// Show upper body outline on players in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerUpperBodyOutline")]
+        public bool EspPlayerUpperBodyOutline { get; set; } = false;
+
+        /// <summary>
+        /// Size multiplier for player upper body outline in ESP.
+        /// </summary>
+        [JsonPropertyName("espPlayerUpperBodyOutlineSize")]
+        public float EspPlayerUpperBodyOutlineSize { get; set; } = 1.2f;
+
+        /// <summary>
+        /// Base opacity for player upper body outline (always visible ghost outline).
+        /// </summary>
+        [JsonPropertyName("espPlayerOutlineBaseOpacity")]
+        public float EspPlayerOutlineBaseOpacity { get; set; } = 0.35f;
+
+        /// <summary>
+        /// Visible overlay opacity for player upper body outline (bright overlay on visible parts).
+        /// </summary>
+        [JsonPropertyName("espPlayerOutlineVisibleOpacity")]
+        public float EspPlayerOutlineVisibleOpacity { get; set; } = 1.0f;
+
+        /// <summary>
+        /// Show upper body outline on AI in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIUpperBodyOutline")]
+        public bool EspAIUpperBodyOutline { get; set; } = false;
+
+        /// <summary>
+        /// Size multiplier for AI upper body outline in ESP.
+        /// </summary>
+        [JsonPropertyName("espAIUpperBodyOutlineSize")]
+        public float EspAIUpperBodyOutlineSize { get; set; } = 1.2f;
+
+        /// <summary>
+        /// Base opacity for AI upper body outline (always visible ghost outline).
+        /// </summary>
+        [JsonPropertyName("espAIOutlineBaseOpacity")]
+        public float EspAIOutlineBaseOpacity { get; set; } = 0.35f;
+
+        /// <summary>
+        /// Visible overlay opacity for AI upper body outline (bright overlay on visible parts).
+        /// </summary>
+        [JsonPropertyName("espAIOutlineVisibleOpacity")]
+        public float EspAIOutlineVisibleOpacity { get; set; } = 1.0f;
+
+        /// <summary>
         /// Show ESP Overlay.
         /// </summary>
         [JsonPropertyName("showESP")]

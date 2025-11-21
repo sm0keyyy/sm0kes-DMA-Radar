@@ -159,6 +159,14 @@ namespace LoneEftDmaRadar.UI.ESP
             public readonly bool EspAIHeadCircles;
             public readonly float EspAIHeadCircleSize;
             // public readonly bool EspAIHealthBars; // TODO: Add to EftDmaConfig.cs when health data is available
+            public readonly bool EspPlayerUpperBodyOutline;
+            public readonly float EspPlayerUpperBodyOutlineSize;
+            public readonly float EspPlayerOutlineBaseOpacity;
+            public readonly float EspPlayerOutlineVisibleOpacity;
+            public readonly bool EspAIUpperBodyOutline;
+            public readonly float EspAIUpperBodyOutlineSize;
+            public readonly float EspAIOutlineBaseOpacity;
+            public readonly float EspAIOutlineVisibleOpacity;
             public readonly bool EspTextOutlines;
             public readonly bool EspCornerBoxes;
             public readonly float EspCornerLength;
@@ -198,6 +206,14 @@ namespace LoneEftDmaRadar.UI.ESP
                 EspAIHeadCircles = App.Config.UI.EspAIHeadCircles;
                 EspAIHeadCircleSize = App.Config.UI.EspAIHeadCircleSize;
                 // EspAIHealthBars = App.Config.UI.EspAIHealthBars; // TODO: Add to EftDmaConfig.cs
+                EspPlayerUpperBodyOutline = App.Config.UI.EspPlayerUpperBodyOutline;
+                EspPlayerUpperBodyOutlineSize = App.Config.UI.EspPlayerUpperBodyOutlineSize;
+                EspPlayerOutlineBaseOpacity = App.Config.UI.EspPlayerOutlineBaseOpacity;
+                EspPlayerOutlineVisibleOpacity = App.Config.UI.EspPlayerOutlineVisibleOpacity;
+                EspAIUpperBodyOutline = App.Config.UI.EspAIUpperBodyOutline;
+                EspAIUpperBodyOutlineSize = App.Config.UI.EspAIUpperBodyOutlineSize;
+                EspAIOutlineBaseOpacity = App.Config.UI.EspAIOutlineBaseOpacity;
+                EspAIOutlineVisibleOpacity = App.Config.UI.EspAIOutlineVisibleOpacity;
                 EspTextOutlines = App.Config.UI.EspTextOutlines;
                 EspCornerBoxes = App.Config.UI.EspCornerBoxes;
                 EspCornerLength = App.Config.UI.EspCornerLength;
@@ -676,6 +692,7 @@ namespace LoneEftDmaRadar.UI.ESP
             bool drawBox = isAI ? cfg.EspAIBoxes : cfg.EspPlayerBoxes;
             bool drawName = isAI ? cfg.EspAINames : cfg.EspPlayerNames;
             bool drawHeadCircle = isAI ? cfg.EspAIHeadCircles : cfg.EspPlayerHeadCircles;
+            bool drawUpperBodyOutline = isAI ? cfg.EspAIUpperBodyOutline : cfg.EspPlayerUpperBodyOutline;
             // bool drawHealthBar = isAI ? cfg.EspAIHealthBars : cfg.EspPlayerHealthBars; // TODO: Enable when config added
 
             if (drawSkeleton)
@@ -712,6 +729,29 @@ namespace LoneEftDmaRadar.UI.ESP
                 }
             }
 
+            if (drawUpperBodyOutline)
+            {
+                float sizeMultiplier = isAI ? cfg.EspAIUpperBodyOutlineSize : cfg.EspPlayerUpperBodyOutlineSize;
+                float baseOpacity = isAI ? cfg.EspAIOutlineBaseOpacity : cfg.EspPlayerOutlineBaseOpacity;
+                float visibleOpacity = isAI ? cfg.EspAIOutlineVisibleOpacity : cfg.EspPlayerOutlineVisibleOpacity;
+
+                // For now, all parts are visible (no raycast integration yet)
+                // When raycast is added, pass actual visibility booleans here
+                DrawUpperBodyOutline(
+                    canvas,
+                    player,
+                    screenWidth,
+                    screenHeight,
+                    _boxPaint,
+                    sizeMultiplier,
+                    baseOpacity,
+                    visibleOpacity,
+                    headVisible: true,
+                    upperChestVisible: true,
+                    lowerChestVisible: true
+                );
+            }
+
             if (drawName && TryProject(player.GetBonePos(Bones.HumanHead), screenWidth, screenHeight, out var headScreen))
             {
                 DrawPlayerName(canvas, headScreen, player, distance, in cfg);
@@ -735,6 +775,134 @@ namespace LoneEftDmaRadar.UI.ESP
                 if (TryProject(p1, w, h, out var s1) && TryProject(p2, w, h, out var s2))
                 {
                     canvas.DrawLine(s1, s2, _skeletonPaint);
+                }
+            }
+        }
+
+        private void DrawUpperBodyOutline(
+            SKCanvas canvas,
+            AbstractPlayer player,
+            float w,
+            float h,
+            SKPaint paint,
+            float sizeMultiplier,
+            float baseOpacity,
+            float visibleOpacity,
+            bool headVisible = true,
+            bool upperChestVisible = true,
+            bool lowerChestVisible = true)
+        {
+            // Get bone positions
+            var headPos = player.GetBonePos(Bones.HumanHead);
+            var neckPos = player.GetBonePos(Bones.HumanNeck);
+            var spine3Pos = player.GetBonePos(Bones.HumanSpine3);
+            var spine2Pos = player.GetBonePos(Bones.HumanSpine2);
+
+            // Project to screen space
+            if (!TryProject(headPos, w, h, out var headScreen) ||
+                !TryProject(neckPos, w, h, out var neckScreen) ||
+                !TryProject(spine3Pos, w, h, out var spine3Screen) ||
+                !TryProject(spine2Pos, w, h, out var spine2Screen))
+            {
+                return; // Can't draw if key bones aren't visible
+            }
+
+            // Calculate dimensions
+            float headNeckDist = Vector2.Distance(
+                new Vector2(headScreen.X, headScreen.Y),
+                new Vector2(neckScreen.X, neckScreen.Y)
+            );
+
+            float totalHeight = Vector2.Distance(
+                new Vector2(headScreen.X, headScreen.Y),
+                new Vector2(spine2Screen.X, spine2Screen.Y)
+            );
+
+            float width = headNeckDist * sizeMultiplier * 2f; // Width based on head size
+            float centerX = (headScreen.X + spine2Screen.X) / 2f;
+            float centerY = (headScreen.Y + spine2Screen.Y) / 2f;
+
+            // Create ellipse rect
+            var ellipseRect = new SKRect(
+                centerX - width / 2f,
+                centerY - totalHeight / 2f,
+                centerX + width / 2f,
+                centerY + totalHeight / 2f
+            );
+
+            // Layer 1: Draw base silhouette (faded, always visible)
+            using (var basePaint = paint.Clone())
+            {
+                basePaint.Color = basePaint.Color.WithAlpha((byte)(255 * baseOpacity));
+                canvas.DrawOval(ellipseRect, basePaint);
+            }
+
+            // Layer 2: Draw visible segments overlay (bright)
+            // Split ellipse into 3 segments: head (top 35%), upper chest (middle 35%), lower chest (bottom 30%)
+            float segmentHeight = totalHeight / 3f;
+
+            using (var visiblePaint = paint.Clone())
+            {
+                visiblePaint.Color = visiblePaint.Color.WithAlpha((byte)(255 * visibleOpacity));
+
+                // Head segment (top third)
+                if (headVisible)
+                {
+                    var headRect = new SKRect(
+                        ellipseRect.Left,
+                        ellipseRect.Top,
+                        ellipseRect.Right,
+                        ellipseRect.Top + segmentHeight * 1.2f
+                    );
+
+                    using (var path = new SKPath())
+                    {
+                        path.AddOval(ellipseRect);
+                        canvas.Save();
+                        canvas.ClipRect(headRect);
+                        canvas.DrawOval(ellipseRect, visiblePaint);
+                        canvas.Restore();
+                    }
+                }
+
+                // Upper chest segment (middle third)
+                if (upperChestVisible)
+                {
+                    var upperChestRect = new SKRect(
+                        ellipseRect.Left,
+                        ellipseRect.Top + segmentHeight * 0.8f,
+                        ellipseRect.Right,
+                        ellipseRect.Top + segmentHeight * 2.2f
+                    );
+
+                    using (var path = new SKPath())
+                    {
+                        path.AddOval(ellipseRect);
+                        canvas.Save();
+                        canvas.ClipRect(upperChestRect);
+                        canvas.DrawOval(ellipseRect, visiblePaint);
+                        canvas.Restore();
+                    }
+                }
+
+                // Lower chest segment (bottom third)
+                if (lowerChestVisible)
+                {
+                    var lowerChestRect = new SKRect(
+                        ellipseRect.Left,
+                        ellipseRect.Top + segmentHeight * 1.8f,
+                        ellipseRect.Right,
+                        ellipseRect.Bottom
+                    );
+
+                    using (var path = new SKPath())
+                    {
+                        path.AddOval(ellipseRect);
+                        canvas.Save();
+                        canvas.ClipRect(lowerChestRect);
+                        canvas.DrawOval(ellipseRect, visiblePaint);
+                        canvas.Restore();
+                    }
                 }
             }
         }

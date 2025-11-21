@@ -206,6 +206,110 @@ namespace LoneEftDmaRadar.UI.Radar.ViewModels
             }
         }
 
+        public bool EspPlayerUpperBodyOutline
+        {
+            get => App.Config.UI.EspPlayerUpperBodyOutline;
+            set
+            {
+                if (App.Config.UI.EspPlayerUpperBodyOutline != value)
+                {
+                    App.Config.UI.EspPlayerUpperBodyOutline = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspPlayerUpperBodyOutlineSize
+        {
+            get => App.Config.UI.EspPlayerUpperBodyOutlineSize;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspPlayerUpperBodyOutlineSize - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspPlayerUpperBodyOutlineSize = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspPlayerOutlineBaseOpacity
+        {
+            get => App.Config.UI.EspPlayerOutlineBaseOpacity;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspPlayerOutlineBaseOpacity - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspPlayerOutlineBaseOpacity = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspPlayerOutlineVisibleOpacity
+        {
+            get => App.Config.UI.EspPlayerOutlineVisibleOpacity;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspPlayerOutlineVisibleOpacity - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspPlayerOutlineVisibleOpacity = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public bool EspAIUpperBodyOutline
+        {
+            get => App.Config.UI.EspAIUpperBodyOutline;
+            set
+            {
+                if (App.Config.UI.EspAIUpperBodyOutline != value)
+                {
+                    App.Config.UI.EspAIUpperBodyOutline = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspAIUpperBodyOutlineSize
+        {
+            get => App.Config.UI.EspAIUpperBodyOutlineSize;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspAIUpperBodyOutlineSize - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspAIUpperBodyOutlineSize = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspAIOutlineBaseOpacity
+        {
+            get => App.Config.UI.EspAIOutlineBaseOpacity;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspAIOutlineBaseOpacity - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspAIOutlineBaseOpacity = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
+        public float EspAIOutlineVisibleOpacity
+        {
+            get => App.Config.UI.EspAIOutlineVisibleOpacity;
+            set
+            {
+                if (Math.Abs(App.Config.UI.EspAIOutlineVisibleOpacity - value) > float.Epsilon)
+                {
+                    App.Config.UI.EspAIOutlineVisibleOpacity = value;
+                    OnPropertyChanged();
+                }
+            }
+        }
+
         public bool EspTextOutlines
         {
             get => App.Config.UI.EspTextOutlines;
