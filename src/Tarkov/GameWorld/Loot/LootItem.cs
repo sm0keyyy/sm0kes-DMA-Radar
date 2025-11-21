@@ -42,12 +42,14 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
     {
         private static EftDmaConfig Config { get; } = App.Config;
         private readonly TarkovMarketItem _item;
+        private readonly bool _isQuestItem;
 
-        public LootItem(TarkovMarketItem item, Vector3 position)
+        public LootItem(TarkovMarketItem item, Vector3 position, bool isQuestItem = false)
         {
             ArgumentNullException.ThrowIfNull(item, nameof(item));
             _item = item;
             _position = position;
+            _isQuestItem = isQuestItem;
         }
 
         public LootItem(string id, string name, Vector3 position)
@@ -168,6 +170,11 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
         }
         public bool IsWeapon => _item.IsWeapon;
         public bool IsCurrency => _item.IsCurrency;
+
+        /// <summary>
+        /// True if this item is a quest item.
+        /// </summary>
+        public bool IsQuestItem => _isQuestItem;
 
         /// <summary>
         /// Checks if an item exceeds regular loot price threshold.
@@ -353,7 +360,9 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
             }
             else
             {
-                if (IsImportant)
+                if (IsQuestItem)
+                    label = "[QUEST] ";
+                else if (IsImportant)
                     label += "!!";
                 else if (Price > 0)
                     label += $"[{Utilities.FormatNumberKM(Price)}] ";
@@ -367,6 +376,8 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot
 
         private ValueTuple<SKPaint, SKPaint> GetPaints()
         {
+            if (IsQuestItem)
+                return new(SKPaints.PaintQuestItem, SKPaints.TextQuestItem);
             if (IsWishlisted)
                 return new(SKPaints.PaintWishlistItem, SKPaints.TextWishlistItem);
             if (LootFilter.ShowBackpacks && IsBackpack)

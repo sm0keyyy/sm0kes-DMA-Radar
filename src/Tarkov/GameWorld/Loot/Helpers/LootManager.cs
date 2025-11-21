@@ -1,7 +1,7 @@
-﻿/*
+/*
  * Lone EFT DMA Radar
  * Brought to you by Lone (Lone DMA)
- * 
+ *
 MIT License
 
 Copyright (c) 2025 Lone DMA
@@ -195,7 +195,7 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot.Helpers
                                                 };
                                             }
                                         };
-                                    }
+                                                    }
                                 };
                             }
                         };
@@ -256,15 +256,12 @@ namespace LoneEftDmaRadar.Tarkov.GameWorld.Loot.Helpers
                     var itemTemplate = Memory.ReadPtr(item + Offsets.LootItem.Template); //EFT.InventoryLogic.ItemTemplate
                     var isQuestItem = Memory.ReadValue<bool>(itemTemplate + Offsets.ItemTemplate.QuestItem);
 
-                    if (!isQuestItem)
+                    //Include quest items (previously filtered out) - quest items are special items like pocket watch, Jaeger's Letter, etc.
+                    var mongoId = Memory.ReadValue<MongoID>(itemTemplate + Offsets.ItemTemplate._id);
+                    var id = mongoId.ReadString();
+                    if (TarkovDataManager.AllItems.TryGetValue(id, out var entry))
                     {
-                        //If NOT a quest item. Quest items are like the quest related things you need to find like the pocket watch or Jaeger's Letter etc. We want to ignore these quest items.
-                        var mongoId = Memory.ReadValue<MongoID>(itemTemplate + Offsets.ItemTemplate._id);
-                        var id = mongoId.ReadString();
-                        if (TarkovDataManager.AllItems.TryGetValue(id, out var entry))
-                        {
-                            _ = _loot.TryAdd(p.ItemBase, new LootItem(entry, pos));
-                        }
+                        _ = _loot.TryAdd(p.ItemBase, new LootItem(entry, pos, isQuestItem));
                     }
                 }
             }

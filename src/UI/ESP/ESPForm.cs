@@ -136,6 +136,7 @@ namespace LoneEftDmaRadar.UI.ESP
             public readonly bool EspFood;
             public readonly bool EspMeds;
             public readonly bool EspBackpacks;
+            public readonly bool EspQuestItems;
             public readonly bool EspLootConeEnabled;
             public readonly float EspLootConeAngle;
             public readonly float EspLootConeMaxDistance;
@@ -183,6 +184,7 @@ namespace LoneEftDmaRadar.UI.ESP
                 EspFood = App.Config.UI.EspFood;
                 EspMeds = App.Config.UI.EspMeds;
                 EspBackpacks = App.Config.UI.EspBackpacks;
+                EspQuestItems = App.Config.UI.EspQuestItems;
                 EspLootConeEnabled = App.Config.UI.EspLootConeEnabled;
                 EspLootConeAngle = App.Config.UI.EspLootConeAngle;
                 EspLootConeMaxDistance = App.Config.UI.EspLootConeMaxDistance;
@@ -566,6 +568,7 @@ namespace LoneEftDmaRadar.UI.ESP
                 bool isFood = item.IsFood;
                 bool isMeds = item.IsMeds;
                 bool isBackpack = item.IsBackpack;
+                bool isQuestItem = item.IsQuestItem;
 
                 if (isFood && !cfg.EspFood)
                     continue;
@@ -573,13 +576,16 @@ namespace LoneEftDmaRadar.UI.ESP
                     continue;
                 if (isBackpack && !cfg.EspBackpacks)
                     continue;
+                if (isQuestItem && !cfg.EspQuestItems)
+                    continue;
 
                 if (WorldToScreen2(item.Position, out var screen, screenWidth, screenHeight))
                 {
                      // Calculate cone filter with optimized math
-                     bool inCone = true;
+                     // Quest items always bypass cone filter (always visible)
+                     bool inCone = isQuestItem ? true : true;
 
-                     if (coneEnabled)
+                     if (coneEnabled && !isQuestItem)
                      {
                          // Only apply cone filter if item is within cone max distance (or unlimited)
                          bool withinConeDistance = !coneDistanceRestricted || distSq <= coneMaxDistSq;
@@ -601,6 +607,7 @@ namespace LoneEftDmaRadar.UI.ESP
 
                      var (circlePaint, textPaint) = item switch
                      {
+                         { IsQuestItem: true } => (SKPaints.PaintQuestItem, SKPaints.TextQuestItem),
                          { Important: true } => (SKPaints.PaintFilteredLoot, SKPaints.TextFilteredLoot),
                          { IsValuableLoot: true } => (SKPaints.PaintImportantLoot, SKPaints.TextImportantLoot),
                          { IsBackpack: true } => (SKPaints.PaintBackpacks, SKPaints.TextBackpacks),
@@ -612,10 +619,10 @@ namespace LoneEftDmaRadar.UI.ESP
 
                      canvas.DrawCircle(screen, LOOT_CIRCLE_RADIUS, circlePaint);
 
-                     if (item.Important || inCone)
+                     if (item.Important || isQuestItem || inCone)
                      {
                          var text = item.ShortName;
-                         if (cfg.EspLootPrice)
+                         if (cfg.EspLootPrice && !isQuestItem)
                          {
                              text = item.Important ? item.ShortName : $"{item.ShortName} ({Utilities.FormatNumberKM(item.Price)})";
                          }

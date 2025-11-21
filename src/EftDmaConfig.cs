@@ -718,6 +718,12 @@ namespace LoneEftDmaRadar
         public bool EspBackpacks { get; set; } = false;
 
         /// <summary>
+        /// Show Quest Items on ESP.
+        /// </summary>
+        [JsonPropertyName("espQuestItems")]
+        public bool EspQuestItems { get; set; } = true;
+
+        /// <summary>
         /// Show Corpses on ESP.
         /// </summary>
         [JsonPropertyName("espCorpses")]

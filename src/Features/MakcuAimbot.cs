@@ -161,7 +161,7 @@ namespace LoneEftDmaRadar.Features
                 try
                 {
                     // Wait for game to start
-                    if (!MemDMA.InRaid || Memory.LocalPlayer == null || Memory.Game == null)
+                    if (!Memory.InRaid || Memory.LocalPlayer == null || Memory.Game == null)
                     {
                         ResetAimbot();
                         Thread.Sleep(200);
@@ -473,11 +473,11 @@ namespace LoneEftDmaRadar.Features
                 return false;
 
             // Alive check
-            if (player.IsDead)
+            if (!player.IsAlive)
                 return false;
 
             // Team check
-            if (Config.ExcludeTeammates && player.IsTeammate)
+            if (Config.ExcludeTeammates && player.IsFriendly)
                 return false;
 
             // PMC only check
@@ -492,7 +492,7 @@ namespace LoneEftDmaRadar.Features
         /// </summary>
         private bool IsTargetValid(AbstractPlayer target)
         {
-            return target != null && !target.IsDead;
+            return target != null && target.IsAlive;
         }
 
         #endregion
